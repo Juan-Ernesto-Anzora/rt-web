@@ -35,7 +35,7 @@ function SideNav() {
   return (
     <aside className="w-60 bg-neutral-50 border-r border-neutral-200 p-3">
       {items.map((label) => (
-        <div key={label} className={\`px-4 py-2 rounded-lg \${label==='My Tasks' ? 'bg-primary-600 text-white font-semibold' : 'hover:bg-neutral-100 text-neutral-700'}\`}>
+        <div key={label} className={`px-4 py-2 rounded-lg \${label==='My Tasks' ? 'bg-primary-600 text-white font-semibold' : 'hover:bg-neutral-100 text-neutral-700'}`}>
           {label}
         </div>
       ))}
@@ -45,7 +45,7 @@ function SideNav() {
 
 function KPI({label,value,cls}:{label:string,value:string,cls?:string}){
   return (
-    <div className={\`card p-4 \${cls||''}\`}>
+    <div className={`card p-4 \${cls||''}`}>
       <div className="text-xs font-semibold text-neutral-500">{label}</div>
       <div className="text-2xl font-bold text-neutral-900 mt-1">{value}</div>
     </div>
