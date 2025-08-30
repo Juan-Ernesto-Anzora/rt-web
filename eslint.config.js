@@ -41,5 +41,23 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },
+  },
+  {
+    files: [
+      "vite.config.*",
+      "postcss.config.*",
+      "tailwind.config.*",
+      "*.cjs",
+      "*.config.cjs",
+      "*.config.js",
+      "*.config.mjs",
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.node, // habilita 'module', 'require', etc.
+      },
+      sourceType: "commonjs",
+    },
+    rules: {},
   }
 );

@@ -43,7 +43,7 @@ function SideNav() {
   )
 }
 
-function KPI({label,value,cls}:{label:string,value:string,cls?:string}){
+function KPI({label,value}:{label:string,value:string,cls?:string}){
   return (
     <div className={`card p-4 \${cls||''}`}>
       <div className="text-xs font-semibold text-neutral-500">{label}</div>
