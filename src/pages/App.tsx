@@ -1,4 +1,6 @@
-import React, { useState } from 'react'
+import { useEffect, useState } from "react";
+import api from "../lib/api";
+import { useAuthController } from "../auth/useAuth";
 
 function UserMenu() {
   return (
@@ -35,7 +37,10 @@ function SideNav() {
   return (
     <aside className="w-60 bg-neutral-50 border-r border-neutral-200 p-3">
       {items.map((label) => (
-        <div key={label} className={`px-4 py-2 rounded-lg \${label==='My Tasks' ? 'bg-primary-600 text-white font-semibold' : 'hover:bg-neutral-100 text-neutral-700'}`}>
+        <div
+          key={label}
+          className={`px-4 py-2 rounded-lg ${label==='My Tasks' ? 'bg-primary-600 text-white font-semibold' : 'hover:bg-neutral-100 text-neutral-700'}`}
+        >
           {label}
         </div>
       ))}
@@ -43,52 +48,50 @@ function SideNav() {
   )
 }
 
-function KPI({label,value}:{label:string,value:string,cls?:string}){
+function KPI({ label, value, cls }: { label: string; value: string; cls?: string }) {
   return (
-    <div className={`card p-4 \${cls||''}`}>
+    <div className={`card p-4 ${cls || ''}`}>
       <div className="text-xs font-semibold text-neutral-500">{label}</div>
       <div className="text-2xl font-bold text-neutral-900 mt-1">{value}</div>
     </div>
-  )
+  );
 }
 
-export default function App() {
+function App() {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const { token, tenant } = useAuthController();
+
+  useEffect(() => {
+    if (!token || !tenant) return; // Espera a que estén listos
+    api.get("/requests/")
+      .then((r) => setRequests(r.data.results ?? []))
+      .catch((e) => setError(e?.response?.data?.detail || "Failed to load"));
+  }, [token, tenant]);
+
+  // You may need to define onLogout or import it if used
+  const onLogout = () => {
+    // Implement logout logic here
+  };
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <TopBar onNew={()=>alert('New Request')} />
-      <div className="flex flex-1 gap-0">
-        <SideNav />
-        <main className="flex-1 p-6 space-y-4">
-          <div className="grid grid-cols-4 gap-4">
-            <KPI label="Open" value="24" />
-            <KPI label="In Progress" value="12" />
-            <KPI label="Due Today" value="5" />
-            <KPI label="Overdue" value="3" />
-          </div>
+    <div className="p-6">
+      <header className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-semibold">Home</h1>
+        <button className="text-sm underline" onClick={onLogout}>Logout</button>
+      </header>
 
-          <div className="flex gap-3">
-            <input placeholder="Search tickets…" className="card px-3 h-11 w-[520px] outline-none" />
-            <button className="card px-4 h-11 text-sm font-semibold">Saved Views</button>
-            <button className="btn btn-primary">New Request</button>
-          </div>
-
-          <div className="card p-4">
-            <div className="grid grid-cols-6 text-sm text-neutral-600 font-semibold">
-              <div>ID</div><div>Title</div><div>Status</div><div>Assignee</div><div>Updated</div><div>Priority</div>
-            </div>
-            {[
-              ['RT-2025-001001','VPN not connecting','Open','Ana Gomez','Aug 22, 10:41','High'],
-              ['RT-2025-001002','Email quota exceeded','In Progress','Luis Perez','Aug 22, 09:18','Normal'],
-              ['RT-2025-001003','Printer F3 queue stuck','Waiting','—','Aug 21, 17:02','Low'],
-              ['RT-2025-001004','VPN split tunneling','Closed','Ana Gomez','Aug 20, 15:27','Normal']
-            ].map((r,i)=> (
-              <div key={i} className="grid grid-cols-6 py-3 border-t border-neutral-200 text-sm">
-                {r.map((c,j)=>(<div key={j}>{c}</div>))}
-              </div>
-            ))}
-          </div>
-        </main>
-      </div>
+      {error && <div className="text-red-600">{error}</div>}
+      <ul className="space-y-2">
+        {requests.map((r) => (
+          <li key={r.requestid} className="p-3 rounded border">
+            <div className="font-medium">{r.humanid} — {r.title}</div>
+            <div className="text-sm text-neutral-600">{r.priority} · {r.statusid}</div>
+          </li>
+        ))}
+      </ul>
     </div>
-  )
+  );
 }
+
+export default App;
