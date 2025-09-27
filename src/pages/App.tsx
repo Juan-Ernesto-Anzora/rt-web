@@ -1,97 +1,265 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AxiosError } from "axios";
+import { useAuth } from "../auth/useAuth";
 import api from "../lib/api";
-import { useAuthController } from "../auth/useAuth";
 
-function UserMenu() {
+type RequestSummary = {
+  requestid?: string;
+  humanid?: string;
+  title: string;
+  statusid?: string;
+  assignee?: string | null;
+  updated_at?: string;
+  priority?: string;
+};
+
+type RequestsResponse = {
+  results?: RequestSummary[];
+};
+
+const NAV_ITEMS = [
+  "New Request",
+  "My Tasks",
+  "Other Tasks",
+  "My Requests",
+  "Search",
+  "Settings",
+];
+
+function UserMenu({ onLogout }: { onLogout(): void }) {
+  const menuItems = [
+    "Profile & Preferences",
+    "Keyboard Shortcuts",
+    "Saved Views",
+    "Notifications",
+    "Switch Company/Tenant",
+  ];
+
   return (
-    <div className="absolute right-6 top-16 w-64 bg-white rounded-xl shadow-lg border border-neutral-200 p-2">
-      {['Profile & Preferences','Keyboard Shortcuts','Saved Views','Notifications','Switch Company/Tenant','Log out'].map((label) => (
-        <div key={label} className="px-3 py-2 rounded-lg hover:bg-neutral-100 cursor-pointer font-medium text-sm">
+    <div className="absolute right-6 top-16 w-64 rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
+      {menuItems.map((label) => (
+        <button
+          key={label}
+          type="button"
+          className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
           {label}
-        </div>
+        </button>
       ))}
+      <button
+        type="button"
+        onClick={onLogout}
+        className="mt-1 block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-danger-500 hover:bg-neutral-100"
+      >
+        Log out
+      </button>
     </div>
-  )
+  );
 }
 
-function TopBar({onNew}:{onNew:()=>void}) {
-  const [open, setOpen] = useState(false)
+function TopBar({ tenant, onNew, onLogout }: { tenant?: string | null; onNew(): void; onLogout(): void }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <header className="h-16 bg-white border-b border-neutral-200 flex items-center justify-between px-6">
-      <div className="font-semibold text-lg text-neutral-800">Request Tracker</div>
-      <div className="flex items-center gap-3 relative">
-        <button className="btn btn-primary" onClick={onNew}>New Request</button>
-        <div className="px-3 py-1 rounded-2xl bg-neutral-100 border border-neutral-300 text-sm font-semibold">Tenant: ACME</div>
-        <div className="flex items-center gap-2 cursor-pointer" onClick={()=>setOpen(!open)}>
-          <div className="w-8 h-8 rounded-full bg-primary-600" />
-          <span className="text-sm font-medium text-neutral-800">Ana Gomez</span>
+    <header className="flex h-16 items-center justify-between border-b border-neutral-200 bg-white px-6">
+      <div className="text-lg font-semibold text-neutral-800">Request Tracker</div>
+      <div className="relative flex items-center gap-3">
+        <button type="button" className="btn btn-primary" onClick={onNew}>
+          New Request
+        </button>
+        <div className="rounded-2xl border border-neutral-300 bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-700">
+          Tenant: {tenant ?? "—"}
         </div>
-        {open && <UserMenu />}
+        <button
+          type="button"
+          className="flex items-center gap-2"
+          onClick={() => setOpen((value) => !value)}
+          aria-haspopup="menu"
+          aria-expanded={open}
+        >
+          <div className="h-8 w-8 rounded-full bg-primary-600" />
+          <span className="text-sm font-medium text-neutral-800">Ana Gomez</span>
+        </button>
+        {open && <UserMenu onLogout={onLogout} />}
       </div>
     </header>
-  )
+  );
 }
 
 function SideNav() {
-  const items = ['New Request','My Tasks','Other Tasks','My Requests','Search','Settings','Logout']
   return (
-    <aside className="w-60 bg-neutral-50 border-r border-neutral-200 p-3">
-      {items.map((label) => (
+    <aside className="w-60 border-r border-neutral-200 bg-neutral-50 p-3">
+      {NAV_ITEMS.map((label) => (
         <div
           key={label}
-          className={`px-4 py-2 rounded-lg ${label==='My Tasks' ? 'bg-primary-600 text-white font-semibold' : 'hover:bg-neutral-100 text-neutral-700'}`}
+          className={`px-4 py-2 text-neutral-700 ${label === "My Tasks" ? "rounded-lg bg-primary-600 font-semibold text-white" : "rounded-lg hover:bg-neutral-100"}`}
         >
           {label}
         </div>
       ))}
     </aside>
-  )
+  );
 }
 
-function KPI({ label, value, cls }: { label: string; value: string; cls?: string }) {
+function KPI({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`card p-4 ${cls || ''}`}>
+    <div className="card p-4">
       <div className="text-xs font-semibold text-neutral-500">{label}</div>
-      <div className="text-2xl font-bold text-neutral-900 mt-1">{value}</div>
+      <div className="mt-1 text-2xl font-bold text-neutral-900">{value}</div>
     </div>
   );
 }
 
-function App() {
-  const [requests, setRequests] = useState<any[]>([]);
+const FALLBACK_REQUESTS: RequestSummary[] = [
+  {
+    humanid: "RT-2025-001001",
+    title: "VPN not connecting",
+    statusid: "Open",
+    assignee: "Ana Gomez",
+    updated_at: "2025-08-22T10:41:00Z",
+    priority: "High",
+  },
+  {
+    humanid: "RT-2025-001002",
+    title: "Email quota exceeded",
+    statusid: "In Progress",
+    assignee: "Luis Perez",
+    updated_at: "2025-08-22T09:18:00Z",
+    priority: "Normal",
+  },
+  {
+    humanid: "RT-2025-001003",
+    title: "Printer F3 queue stuck",
+    statusid: "Waiting",
+    assignee: null,
+    updated_at: "2025-08-21T17:02:00Z",
+    priority: "Low",
+  },
+  {
+    humanid: "RT-2025-001004",
+    title: "VPN split tunneling",
+    statusid: "Closed",
+    assignee: "Ana Gomez",
+    updated_at: "2025-08-20T15:27:00Z",
+    priority: "Normal",
+  },
+];
+
+export default function App() {
+  const { tenant, logout } = useAuth();
+  const [requests, setRequests] = useState<RequestSummary[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { token, tenant } = useAuthController();
 
   useEffect(() => {
-    if (!token || !tenant) return; // Espera a que estén listos
-    api.get("/requests/")
-      .then((r) => setRequests(r.data.results ?? []))
-      .catch((e) => setError(e?.response?.data?.detail || "Failed to load"));
-  }, [token, tenant]);
+    let cancelled = false;
 
-  // You may need to define onLogout or import it if used
-  const onLogout = () => {
-    // Implement logout logic here
-  };
+    async function loadRequests() {
+      if (!tenant) return;
+      setLoading(true);
+      try {
+        const response = await api.get<RequestsResponse>("/requests/");
+        if (cancelled) return;
+        setRequests(response.data.results ?? []);
+        setError(null);
+      } catch (requestError) {
+        if (cancelled) return;
+        const axiosError = requestError as AxiosError<{ detail?: string }>;
+        const detail = axiosError.response?.data?.detail;
+        setError(detail ?? "Failed to load requests");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadRequests();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenant]);
+
+  const rows = useMemo(() => {
+    const source = requests.length > 0 ? requests : FALLBACK_REQUESTS;
+    return source.map((request) => ({
+      id: request.humanid ?? request.requestid ?? "—",
+      title: request.title,
+      status: request.statusid ?? "—",
+      assignee: request.assignee ?? "—",
+      updated:
+        request.updated_at && !Number.isNaN(Date.parse(request.updated_at))
+          ? new Date(request.updated_at).toLocaleString(undefined, {
+              month: "short",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
+      priority: request.priority ?? "—",
+    }));
+  }, [requests]);
 
   return (
-    <div className="p-6">
-      <header className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-semibold">Home</h1>
-        <button className="text-sm underline" onClick={onLogout}>Logout</button>
-      </header>
+    <div className="flex min-h-screen flex-col">
+      <TopBar tenant={tenant} onNew={() => alert("New Request")} onLogout={logout} />
+      <div className="flex flex-1">
+        <SideNav />
+        <main className="flex-1 space-y-4 p-6">
+          <div className="grid grid-cols-4 gap-4">
+            <KPI label="Open" value="24" />
+            <KPI label="In Progress" value="12" />
+            <KPI label="Due Today" value="5" />
+            <KPI label="Overdue" value="3" />
+          </div>
 
-      {error && <div className="text-red-600">{error}</div>}
-      <ul className="space-y-2">
-        {requests.map((r) => (
-          <li key={r.requestid} className="p-3 rounded border">
-            <div className="font-medium">{r.humanid} — {r.title}</div>
-            <div className="text-sm text-neutral-600">{r.priority} · {r.statusid}</div>
-          </li>
-        ))}
-      </ul>
+          <div className="flex gap-3">
+            <input
+              placeholder="Search tickets…"
+              className="card h-11 w-[520px] px-3 outline-none"
+              aria-label="Search tickets"
+            />
+            <button type="button" className="card h-11 px-4 text-sm font-semibold">
+              Saved Views
+            </button>
+            <button type="button" className="btn btn-primary">
+              New Request
+            </button>
+          </div>
+
+          <div className="card p-4">
+            <div className="grid grid-cols-6 text-sm font-semibold text-neutral-600">
+              <div>ID</div>
+              <div>Title</div>
+              <div>Status</div>
+              <div>Assignee</div>
+              <div>Updated</div>
+              <div>Priority</div>
+            </div>
+
+            {loading && <div className="py-6 text-sm text-neutral-500">Loading requests…</div>}
+            {error && !loading && (
+              <div className="py-6 text-sm text-danger-500">{error}</div>
+            )}
+
+            {!loading && !error && (
+              <div className="divide-y divide-neutral-200">
+                {rows.map((row) => (
+                  <div key={`${row.id}-${row.title}`} className="grid grid-cols-6 py-3 text-sm">
+                    <div>{row.id}</div>
+                    <div>{row.title}</div>
+                    <div>{row.status}</div>
+                    <div>{row.assignee}</div>
+                    <div>{row.updated}</div>
+                    <div>{row.priority}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
-
-export default App;
