@@ -20,6 +20,14 @@ const router = createBrowserRouter([
     element: <Login />,
   },
   {
+    path: "/search",
+    element: (
+      <Protected>
+        <App initialView="search" />
+      </Protected>
+    ),
+  },
+  {
     path: "/",
     element: (
       <Protected>

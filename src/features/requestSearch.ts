@@ -87,7 +87,7 @@ export function buildSearchParams(filters: RequestSearchFilters) {
 }
 
 export async function searchRequests(filters: RequestSearchFilters): Promise<RequestSearchResponse> {
-  const response = await api.get<SearchResponseDto | SearchResultDto[]>("/requests/search/", {
+  const response = await api.get<SearchResponseDto | SearchResultDto[]>("/search", {
     params: buildSearchParams(filters),
   });
   const results = Array.isArray(response.data) ? response.data : response.data.results ?? [];
