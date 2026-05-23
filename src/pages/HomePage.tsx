@@ -284,10 +284,7 @@ export function HomePage() {
       {!listLoading && requests.length > 0 && (
         <RequestTable
           requests={requests}
-          onOpenRequest={(requestId) => {
-            console.log("Open request", requestId);
-            alert("Request detail page coming next.");
-          }}
+          onOpenRequest={(requestId) => navigate(`/requests/${encodeURIComponent(requestId)}`)}
         />
       )}
     </section>
