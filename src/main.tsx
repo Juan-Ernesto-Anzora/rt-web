@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth/useAuth";
 import "./index.css";
 import App from "./pages/App";
 import Login from "./pages/Login";
+import RequestDetailPage from "./pages/RequestDetailPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -24,6 +25,14 @@ const router = createBrowserRouter([
     element: (
       <Protected>
         <App initialView="search" />
+      </Protected>
+    ),
+  },
+  {
+    path: "/requests/:id",
+    element: (
+      <Protected>
+        <RequestDetailPage />
       </Protected>
     ),
   },

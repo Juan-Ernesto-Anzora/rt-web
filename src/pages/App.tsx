@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { AxiosError } from "axios";
 import { HomePage } from "./HomePage";
 import { useAuth } from "../auth/useAuth";
@@ -236,7 +236,13 @@ function FacetGroup({
   );
 }
 
-function SearchResultsTable({ results }: { results: RequestSearchResult[] }) {
+function SearchResultsTable({
+  results,
+  onOpenRequest,
+}: {
+  results: RequestSearchResult[];
+  onOpenRequest(requestId: string): void;
+}) {
   return (
     <div className="card overflow-hidden">
       <div className="grid grid-cols-[130px_1fr_112px_132px_130px_116px] border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-600">
@@ -249,8 +255,10 @@ function SearchResultsTable({ results }: { results: RequestSearchResult[] }) {
       </div>
       <div>
         {results.map((result) => (
-          <div
+          <button
             key={result.id}
+            type="button"
+            onClick={() => onOpenRequest(result.id)}
             className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50"
           >
             <div className="font-semibold text-neutral-800">{result.id}</div>
@@ -275,7 +283,7 @@ function SearchResultsTable({ results }: { results: RequestSearchResult[] }) {
             <div className="truncate pr-4 text-neutral-700">{result.assignee}</div>
             <div className="truncate pr-4 text-neutral-700">{result.flow}</div>
             <div className="text-neutral-700">{result.updatedAt ? formatDate(result.updatedAt) : "-"}</div>
-          </div>
+          </button>
         ))}
       </div>
     </div>
@@ -283,6 +291,7 @@ function SearchResultsTable({ results }: { results: RequestSearchResult[] }) {
 }
 
 function SearchView() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialQuery = searchParams.get("q") ?? "";
   const [filters, setFilters] = useState<RequestSearchFilters>({ ...EMPTY_SEARCH_FILTERS, query: initialQuery });
@@ -456,7 +465,12 @@ function SearchView() {
               No requests matched the current search and facets.
             </div>
           )}
-          {!loading && results.length > 0 && <SearchResultsTable results={results} />}
+          {!loading && results.length > 0 && (
+            <SearchResultsTable
+              results={results}
+              onOpenRequest={(requestId) => navigate(`/requests/${encodeURIComponent(requestId)}`)}
+            />
+          )}
           <div className="flex items-center justify-between text-sm text-neutral-600">
             <div>
               Page {filters.page} of {totalPages}
