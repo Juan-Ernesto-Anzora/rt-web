@@ -55,6 +55,8 @@ const FALLBACK_ACTIVITY: RequestActivityEvent[] = [
   },
 ];
 
+const ENABLE_DEMO_DETAIL_FALLBACK = import.meta.env.VITE_ENABLE_DEMO_DETAIL_FALLBACK === "true";
+
 function formatDate(value?: string) {
   if (!value || Number.isNaN(Date.parse(value))) return "-";
   return new Date(value).toLocaleString(undefined, {
@@ -179,6 +181,7 @@ export default function RequestDetailPage() {
   const [activity, setActivity] = useState<RequestActivityEvent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,10 +198,17 @@ export default function RequestDetailPage() {
         setError(null);
       } catch {
         if (cancelled) return;
-        setDetail({ ...FALLBACK_DETAIL, id: requestId });
-        setComments(FALLBACK_COMMENTS);
-        setActivity(FALLBACK_ACTIVITY);
-        setError("Could not load request detail from API. Showing local demo data.");
+        if (ENABLE_DEMO_DETAIL_FALLBACK) {
+          setDetail({ ...FALLBACK_DETAIL, id: requestId });
+          setComments(FALLBACK_COMMENTS);
+          setActivity(FALLBACK_ACTIVITY);
+          setError("Could not load request detail from API. Showing local demo data.");
+          return;
+        }
+        setDetail(null);
+        setComments([]);
+        setActivity([]);
+        setError("Could not load request detail from API. Please confirm the request exists and try again.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -209,14 +219,19 @@ export default function RequestDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [requestId]);
+  }, [requestId, loadAttempt]);
 
   if (!detail && loading) {
     return <div className="p-6 text-sm text-neutral-500">Loading request detail...</div>;
   }
 
   if (!detail) {
-    return <ErrorState message="Request detail is unavailable." onRetry={() => navigate("/")} />;
+    return (
+      <ErrorState
+        message={error ?? "Request detail is unavailable."}
+        onRetry={() => setLoadAttempt((current) => current + 1)}
+      />
+    );
   }
 
   return (
@@ -235,7 +250,7 @@ export default function RequestDetailPage() {
             <h1 className="mt-1 text-2xl font-semibold text-neutral-900">{detail.title}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <StatusBadge status={detail.status} />
+            <StatusBadge status={detail.status} category={detail.statusCategory} />
             <PriorityChip priority={detail.priority} />
           </div>
         </div>

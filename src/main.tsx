@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth/useAuth";
 import "./index.css";
 import App from "./pages/App";
 import Login from "./pages/Login";
+import RequestCreatePage from "./pages/RequestCreatePage";
 import RequestDetailPage from "./pages/RequestDetailPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -25,6 +26,14 @@ const router = createBrowserRouter([
     element: (
       <Protected>
         <App initialView="search" />
+      </Protected>
+    ),
+  },
+  {
+    path: "/requests/new",
+    element: (
+      <Protected>
+        <RequestCreatePage />
       </Protected>
     ),
   },

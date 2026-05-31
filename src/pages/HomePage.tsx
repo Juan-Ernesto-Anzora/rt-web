@@ -60,6 +60,7 @@ const FALLBACK_SUMMARY: DashboardSummary = {
 const FALLBACK_REQUESTS: DashboardRequest[] = [
   {
     id: "RT-2025-001001",
+    requestId: "RT-2025-001001",
     title: "VPN not connecting",
     status: "Open",
     priority: "High",
@@ -69,6 +70,7 @@ const FALLBACK_REQUESTS: DashboardRequest[] = [
   },
   {
     id: "RT-2025-001002",
+    requestId: "RT-2025-001002",
     title: "Email quota exceeded",
     status: "In Progress",
     priority: "Normal",
@@ -78,6 +80,7 @@ const FALLBACK_REQUESTS: DashboardRequest[] = [
   },
   {
     id: "RT-2025-001003",
+    requestId: "RT-2025-001003",
     title: "Printer F3 queue stuck",
     status: "Waiting",
     priority: "Low",
@@ -87,6 +90,7 @@ const FALLBACK_REQUESTS: DashboardRequest[] = [
   },
   {
     id: "RT-2025-001004",
+    requestId: "RT-2025-001004",
     title: "VPN split tunneling",
     status: "Closed",
     priority: "Normal",
@@ -199,7 +203,7 @@ export function HomePage() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => alert("New Request is coming in the next step.")}
+            onClick={() => navigate("/requests/new")}
             className="btn btn-primary"
           >
             New Request
