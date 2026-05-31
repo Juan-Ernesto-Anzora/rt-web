@@ -35,13 +35,16 @@ export function RequestTable({
           <button
             key={request.id}
             type="button"
-            onClick={() => onOpenRequest(request.id)}
-            className="grid min-h-12 w-full grid-cols-[120px_1fr_100px_100px_132px_132px_110px] items-center px-4 text-left text-sm hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+            onClick={() => {
+              if (request.requestId) onOpenRequest(request.requestId);
+            }}
+            disabled={!request.requestId}
+            className="grid min-h-12 w-full grid-cols-[120px_1fr_100px_100px_132px_132px_110px] items-center px-4 text-left text-sm hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="font-semibold text-neutral-800">{request.id}</div>
             <div className="truncate pr-4 text-neutral-900">{request.title}</div>
             <div>
-              <StatusBadge status={request.status} />
+              <StatusBadge status={request.status} category={request.statusCategory} />
             </div>
             <div>
               <PriorityChip priority={request.priority} />

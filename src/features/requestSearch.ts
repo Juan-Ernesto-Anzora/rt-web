@@ -17,8 +17,10 @@ export type RequestSearchFilters = {
 
 export type RequestSearchResult = {
   id: string;
+  requestId: string;
   title: string;
   status: string;
+  statusCategory?: string;
   assignee: string;
   flow: string;
   tags: string[];
@@ -34,12 +36,14 @@ export type RequestSearchResponse = {
 type SearchResultDto = {
   requestid?: string;
   humanid?: string;
+  request_id?: string;
+  human_id?: string;
   title?: string;
   statusid?: string;
-  status?: string;
-  assignee?: string | null;
+  status?: string | StatusDto | null;
+  assignee?: string | UserDto | null;
   assignee_name?: string | null;
-  flow?: string;
+  flow?: string | FlowDto | null;
   flow_name?: string;
   tags?: string[];
   updated_at?: string;
@@ -52,13 +56,57 @@ type SearchResponseDto = {
   count?: number;
 };
 
+type FlowDto = {
+  flow_id?: string;
+  name?: string;
+  description?: string;
+};
+
+type StatusDto = {
+  status_id?: string;
+  name?: string;
+  category?: string;
+  is_terminal?: boolean;
+};
+
+type UserDto = {
+  user_id?: string;
+  email?: string;
+  display_name?: string;
+  employee_code?: string;
+  avatar_url?: string;
+};
+
+function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
+  if (typeof flow === "string") return flow;
+  return flow?.name ?? fallback ?? "-";
+}
+
+function displayStatus(status?: string | StatusDto | null, fallback?: string) {
+  if (typeof status === "string") return status;
+  return status?.name ?? fallback ?? "-";
+}
+
+function statusCategory(status?: string | StatusDto | null) {
+  if (!status || typeof status === "string") return undefined;
+  return status.category;
+}
+
+function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
+  if (typeof user === "string") return user;
+  return user?.display_name ?? user?.email ?? fallback ?? empty;
+}
+
 function normalizeSearchResult(result: SearchResultDto): RequestSearchResult {
+  const requestId = result.request_id ?? "";
   return {
-    id: result.humanid ?? result.requestid ?? "-",
+    id: (result.human_id ?? result.humanid ?? requestId) || result.requestid || "-",
+    requestId,
     title: result.title ?? "Untitled request",
-    status: result.status ?? result.statusid ?? "-",
-    assignee: result.assignee_name ?? result.assignee ?? "-",
-    flow: result.flow_name ?? result.flow ?? "-",
+    status: displayStatus(result.status, result.statusid),
+    statusCategory: statusCategory(result.status),
+    assignee: displayUser(result.assignee, result.assignee_name, "Unassigned"),
+    flow: displayFlow(result.flow, result.flow_name),
     tags: result.tags ?? [],
     updatedAt: result.updated_at ?? "",
     snippet: result.snippet ?? result.highlight ?? "",

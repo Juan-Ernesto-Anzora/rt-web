@@ -6,6 +6,7 @@ export type RequestDetail = {
   title: string;
   description: string;
   status: string;
+  statusCategory?: string;
   priority: string;
   assignee: string;
   requester: string;
@@ -41,6 +42,27 @@ type AttachmentDto = {
   download_url?: string;
 };
 
+type FlowDto = {
+  flow_id?: string;
+  name?: string;
+  description?: string;
+};
+
+type StatusDto = {
+  status_id?: string;
+  name?: string;
+  category?: string;
+  is_terminal?: boolean;
+};
+
+type UserDto = {
+  user_id?: string;
+  email?: string;
+  display_name?: string;
+  employee_code?: string;
+  avatar_url?: string;
+};
+
 type RequestDetailDto = {
   requestid?: string;
   humanid?: string;
@@ -48,14 +70,14 @@ type RequestDetailDto = {
   human_id?: string;
   title?: string;
   description?: string;
-  status?: string;
+  status?: string | StatusDto | null;
   statusid?: string;
   priority?: string;
-  assignee?: string | null;
+  assignee?: string | UserDto | null;
   assignee_name?: string | null;
-  requester?: string | null;
+  requester?: string | UserDto | null;
   requester_name?: string | null;
-  flow?: string;
+  flow?: string | FlowDto | null;
   flow_name?: string;
   due_at?: string;
   created_at?: string;
@@ -89,16 +111,37 @@ function normalizeAttachment(attachment: AttachmentDto): RequestCommentAttachmen
   };
 }
 
+function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
+  if (typeof flow === "string") return flow;
+  return flow?.name ?? fallback ?? "-";
+}
+
+function displayStatus(status?: string | StatusDto | null, fallback?: string) {
+  if (typeof status === "string") return status;
+  return status?.name ?? fallback ?? "-";
+}
+
+function statusCategory(status?: string | StatusDto | null) {
+  if (!status || typeof status === "string") return undefined;
+  return status.category;
+}
+
+function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
+  if (typeof user === "string") return user;
+  return user?.display_name ?? user?.email ?? fallback ?? empty;
+}
+
 function normalizeDetail(detail: RequestDetailDto): RequestDetail {
   return {
-    id: detail.human_id ?? detail.humanid ?? detail.request_id ?? detail.requestid ?? "-",
+    id: detail.request_id ?? detail.human_id ?? detail.humanid ?? detail.requestid ?? "-",
     title: detail.title ?? "Untitled request",
     description: detail.description ?? "",
-    status: detail.status ?? detail.statusid ?? "-",
+    status: displayStatus(detail.status, detail.statusid),
+    statusCategory: statusCategory(detail.status),
     priority: detail.priority ?? "-",
-    assignee: detail.assignee_name ?? detail.assignee ?? "-",
-    requester: detail.requester_name ?? detail.requester ?? "-",
-    flow: detail.flow_name ?? detail.flow ?? "-",
+    assignee: displayUser(detail.assignee, detail.assignee_name, "Unassigned"),
+    requester: displayUser(detail.requester, detail.requester_name),
+    flow: displayFlow(detail.flow, detail.flow_name),
     dueAt: detail.due_at,
     createdAt: detail.created_at ?? "",
     updatedAt: detail.updated_at ?? "",
@@ -131,11 +174,13 @@ export async function getRequestActivity(requestId: string): Promise<RequestActi
 }
 
 export async function getRequestDetailBundle(requestId: string): Promise<RequestDetailBundle> {
-  const [detail, comments, activity] = await Promise.all([
-    getRequestDetail(requestId),
+  const detail = await getRequestDetail(requestId);
+  const [commentsResult, activityResult] = await Promise.allSettled([
     listRequestComments(requestId),
     getRequestActivity(requestId),
   ]);
+  const comments = commentsResult.status === "fulfilled" ? commentsResult.value : [];
+  const activity = activityResult.status === "fulfilled" ? activityResult.value : [];
 
   return { detail, comments, activity };
 }

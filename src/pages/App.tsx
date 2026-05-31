@@ -38,6 +38,7 @@ const EMPTY_SEARCH_FILTERS: RequestSearchFilters = {
 const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   {
     id: "RT-2025-001001",
+    requestId: "RT-2025-001001",
     title: "VPN not connecting",
     status: "Open",
     assignee: "Ana Gomez",
@@ -48,6 +49,7 @@ const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   },
   {
     id: "RT-2025-001002",
+    requestId: "RT-2025-001002",
     title: "Email quota exceeded",
     status: "In Progress",
     assignee: "Luis Perez",
@@ -58,6 +60,7 @@ const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   },
   {
     id: "RT-2025-001003",
+    requestId: "RT-2025-001003",
     title: "Printer F3 queue stuck",
     status: "Waiting",
     assignee: "-",
@@ -68,6 +71,7 @@ const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   },
   {
     id: "RT-2025-001004",
+    requestId: "RT-2025-001004",
     title: "VPN split tunneling",
     status: "Closed",
     assignee: "Ana Gomez",
@@ -78,6 +82,7 @@ const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   },
   {
     id: "RT-2025-001005",
+    requestId: "RT-2025-001005",
     title: "New hire access package",
     status: "Open",
     assignee: "Marta Ruiz",
@@ -148,7 +153,15 @@ function TopBar({ tenant, onNew, onLogout }: { tenant?: string | null; onNew(): 
   );
 }
 
-function SideNav({ activeView, onNavigate }: { activeView: AppView; onNavigate(view: AppView): void }) {
+function SideNav({
+  activeView,
+  onNavigate,
+  onNewRequest,
+}: {
+  activeView: AppView;
+  onNavigate(view: AppView): void;
+  onNewRequest(): void;
+}) {
   return (
     <aside className="w-60 border-r border-neutral-200 bg-neutral-50 p-3">
       {NAV_ITEMS.map((item) => {
@@ -160,6 +173,7 @@ function SideNav({ activeView, onNavigate }: { activeView: AppView; onNavigate(v
             key={item.id}
             type="button"
             onClick={() => {
+              if (item.id === "new") onNewRequest();
               if (targetView) onNavigate(targetView);
             }}
             className={`mb-1 w-full px-4 py-2 text-left text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${
@@ -184,8 +198,8 @@ function formatDate(value: string) {
   });
 }
 
-function statusClass(status: string) {
-  const normalized = status.toLowerCase();
+function statusClass(status: string, category?: string) {
+  const normalized = (category ?? status).toLowerCase();
   if (normalized.includes("waiting")) return "bg-warning-500/15 text-neutral-900";
   if (normalized.includes("closed")) return "bg-neutral-200 text-neutral-700";
   return "bg-primary-50 text-primary-700";
@@ -258,8 +272,11 @@ function SearchResultsTable({
           <button
             key={result.id}
             type="button"
-            onClick={() => onOpenRequest(result.id)}
-            className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50"
+            onClick={() => {
+              if (result.requestId) onOpenRequest(result.requestId);
+            }}
+            disabled={!result.requestId}
+            className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="font-semibold text-neutral-800">{result.id}</div>
             <div className="min-w-0 pr-4">
@@ -276,7 +293,7 @@ function SearchResultsTable({
               )}
             </div>
             <div>
-              <span className={`rounded px-2 py-1 text-xs font-semibold ${statusClass(result.status)}`}>
+              <span className={`rounded px-2 py-1 text-xs font-semibold ${statusClass(result.status, result.statusCategory)}`}>
                 {result.status}
               </span>
             </div>
@@ -502,17 +519,18 @@ function SearchView() {
 
 export default function App({ initialView = "home" }: { initialView?: AppView }) {
   const { tenant, logout } = useAuth();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState<AppView>(initialView);
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">
       <TopBar
         tenant={tenant}
-        onNew={() => alert("New Request is coming in the next step.")}
+        onNew={() => navigate("/requests/new")}
         onLogout={logout}
       />
       <div className="flex flex-1">
-        <SideNav activeView={activeView} onNavigate={setActiveView} />
+        <SideNav activeView={activeView} onNavigate={setActiveView} onNewRequest={() => navigate("/requests/new")} />
         <main className="flex-1 space-y-4 p-6">{activeView === "search" ? <SearchView /> : <HomePage />}</main>
       </div>
     </div>

@@ -2,8 +2,10 @@ import api from "../lib/api";
 
 export type DashboardRequest = {
   id: string;
+  requestId: string;
   title: string;
   status: string;
+  statusCategory?: string;
   priority: string;
   assignee: string;
   requester: string;
@@ -37,16 +39,18 @@ export type DashboardListResponse = {
 type RequestDto = {
   requestid?: string;
   humanid?: string;
+  request_id?: string;
+  human_id?: string;
   title?: string;
   statusid?: string;
-  status?: string;
+  status?: string | StatusDto | null;
   priority?: string;
-  assignee?: string | null;
+  assignee?: string | UserDto | null;
   assignee_name?: string | null;
-  requester?: string | null;
+  requester?: string | UserDto | null;
   requester_name?: string | null;
   updated_at?: string;
-  flow?: string;
+  flow?: string | FlowDto | null;
   flow_name?: string;
   due_at?: string;
 };
@@ -56,16 +60,60 @@ type RequestListDto = {
   count?: number;
 };
 
+type FlowDto = {
+  flow_id?: string;
+  name?: string;
+  description?: string;
+};
+
+type StatusDto = {
+  status_id?: string;
+  name?: string;
+  category?: string;
+  is_terminal?: boolean;
+};
+
+type UserDto = {
+  user_id?: string;
+  email?: string;
+  display_name?: string;
+  employee_code?: string;
+  avatar_url?: string;
+};
+
+function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
+  if (typeof flow === "string") return flow;
+  return flow?.name ?? fallback ?? "-";
+}
+
+function displayStatus(status?: string | StatusDto | null, fallback?: string) {
+  if (typeof status === "string") return status;
+  return status?.name ?? fallback ?? "-";
+}
+
+function statusCategory(status?: string | StatusDto | null) {
+  if (!status || typeof status === "string") return undefined;
+  return status.category;
+}
+
+function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
+  if (typeof user === "string") return user;
+  return user?.display_name ?? user?.email ?? fallback ?? empty;
+}
+
 function normalizeRequest(request: RequestDto): DashboardRequest {
+  const requestId = request.request_id ?? "";
   return {
-    id: request.humanid ?? request.requestid ?? "-",
+    id: (request.human_id ?? request.humanid ?? requestId) || request.requestid || "-",
+    requestId,
     title: request.title ?? "Untitled request",
-    status: request.status ?? request.statusid ?? "-",
+    status: displayStatus(request.status, request.statusid),
+    statusCategory: statusCategory(request.status),
     priority: request.priority ?? "-",
-    assignee: request.assignee_name ?? request.assignee ?? "-",
-    requester: request.requester_name ?? request.requester ?? "-",
+    assignee: displayUser(request.assignee, request.assignee_name, "Unassigned"),
+    requester: displayUser(request.requester, request.requester_name),
     updatedAt: request.updated_at ?? "",
-    flow: request.flow_name ?? request.flow,
+    flow: displayFlow(request.flow, request.flow_name),
     dueAt: request.due_at,
   };
 }
