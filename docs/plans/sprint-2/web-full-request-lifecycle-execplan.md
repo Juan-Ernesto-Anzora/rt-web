@@ -97,6 +97,20 @@ Implementation steps:
 
 Replace multiple count calls with `GET /api/dashboard/summary/` when available.
 
+Implementation steps:
+
+1. Update `src/api/dashboard.ts`:
+   - Replace the four separate `/requests/` count calls with a single shared-client request to `GET /dashboard/summary/`.
+   - Normalize common response field names: `open`, `in_progress`, `inProgress`, `due_today`, `dueToday`, and `overdue`, including nested `kpis` or `counts` wrappers if returned.
+   - Keep the shared Axios client so `Authorization` and `X-Tenant` headers are included.
+2. Update `src/pages/HomePage.tsx`:
+   - Keep the existing KPI card layout and design-token styling.
+   - Start KPI values at zero and show a clear API error if the summary endpoint fails.
+   - Do not show demo KPI fallback values for authenticated API flows.
+3. Keep out of scope:
+   - Changing dashboard list endpoints or filters.
+   - Adding new charts or page layout patterns.
+
 ### Milestone 5: User profile/preferences
 
 Add profile/preferences route or panel from user menu with display name, email, employee code, tenant info, and placeholder theme/density controls.
@@ -139,6 +153,15 @@ Milestone 3 exact manual verification:
 13. Confirm an optional transition comment appears in the Comments section and the Activity timeline after refresh.
 14. Force or observe an API failure and confirm a clear inline error appears without navigating away.
 
+Milestone 4 exact manual verification:
+
+1. Open Home after logging in with a valid tenant.
+2. In DevTools Network, confirm the KPI load is `GET /api/dashboard/summary/`.
+3. Confirm the request includes `Authorization` and `X-Tenant` headers through the shared API client.
+4. Confirm the old KPI fan-out calls to `/api/requests/?status_category=open`, `/api/requests/?status_category=in_progress`, `/api/requests/?due=today`, and `/api/requests/?overdue=true` are not sent.
+5. Confirm the Open, In Progress, Due Today, and Overdue KPI cards show values from the summary response.
+6. Force or observe a summary endpoint failure and confirm Home shows a clear dashboard summary error without demo KPI values.
+
 ## Acceptance criteria
 
 Request Detail exists; Create Request works; transition/close works; dashboard summary is consumed; profile/preferences exists; states are implemented; UI follows tokens; auth and X-Tenant headers are sent.
@@ -169,12 +192,20 @@ Milestone 3 acceptance criteria:
 - Close actions can include a comment.
 - Activity is refreshed after transition so `status.changed`, `request.closed`, and user transition comments appear in the timeline.
 
+Milestone 4 acceptance criteria:
+
+- Home KPIs are loaded from `GET /dashboard/summary/` through the shared Axios client.
+- Summary response field names are normalized into `open`, `inProgress`, `dueToday`, and `overdue`.
+- KPI cards preserve the existing compact Home UI style and loading state.
+- The old four-request KPI count fan-out is removed.
+- Summary load failures show a clear error and do not display demo fallback KPI values.
+
 ## Progress
 
 - [x] Milestone 1 completed.
 - [x] Milestone 2 completed.
 - [x] Milestone 3 completed.
-- [ ] Milestone 4 completed.
+- [x] Milestone 4 completed.
 - [ ] Milestone 5 completed.
 
 ## Surprises & Discoveries
@@ -199,6 +230,8 @@ Milestone 3 acceptance criteria:
 - 2026-06-06: Transition comments are sent as `comment_markdown`, not `comment`, and activity/status updates are backend workflow responsibilities.
 - 2026-06-06: Closed requests can still have backend-allowed available transitions such as Reopen, so the web must not suppress workflow loading merely because `status.is_terminal` is true.
 - 2026-06-06: The tested transition response accepted `comment_markdown`, but the activity payload still showed `comment_id: null`; the web needs to preserve the user's transition comment visibly by refreshing/including regular request comments in the timeline.
+- 2026-06-06: Home KPI loading was still implemented as four `/requests/` count queries. Day 7 replaces that with the dedicated dashboard summary endpoint.
+- 2026-06-06: The web repo has no local OpenAPI file, so the dashboard summary adapter accepts both snake_case and camelCase response names while pointing at the confirmed summary endpoint path.
 
 ## Decision Log
 
@@ -219,9 +252,13 @@ Milestone 3 acceptance criteria:
 - 2026-06-06: Surface backend validation messages from transition failures directly in the workflow panel.
 - 2026-06-06: Always fetch available transitions from the API for the current request, including terminal/closed requests, and let an empty API response decide whether no actions are available.
 - 2026-06-06: After a successful transition with comment text, create a regular request comment as a visibility fallback and merge comments into the Activity timeline display.
+- 2026-06-06: Use `GET /dashboard/summary/` as the sole KPI source for Home summary cards; keep request list loading unchanged for this milestone.
+- 2026-06-06: Do not fall back to demo KPI values when the authenticated summary endpoint fails; show a clear error while keeping zero or last-known values.
 
 ## Outcomes & Retrospective
 
 Milestone 2 outcome: `/requests/new` now exists as a protected full-page create flow. Top bar, left rail, and Home `New Request` actions navigate to it. The form validates title, description, flow ID, requester ID, and Open status ID before submission, sends `POST /requests/` through the shared Axios client, renders API/form errors without navigating, disables submit while posting, and navigates to `/requests/{request_id}` only when the API returns the public `request_id`. The payload now uses backend field names (`flow_id`, `status_id`, `requester_id`, `assignee_id`) and lowercase priority values. Request Detail loads real API data through the shared Axios client, normalizes nested detail objects into display strings, and no longer shows demo fallback messaging by default. Home and Search row navigation now use `request_id` instead of display IDs and avoid routing missing IDs to `/requests/-`. Create-time attachments, workflow transitions, and close behavior remain deferred to later milestones.
 
 Milestone 3 outcome: Request Detail now loads allowed workflow actions from `GET /requests/{request_id}/available-transitions/`, renders user-friendly labels based on `to_status.name`, stores the selected `transition_id`, applies it with `POST /requests/{request_id}/transition/` and optional `comment_markdown`, and refreshes detail/comments/activity/actions after success. Workflow actions no longer PATCH the request detail endpoint. Closed/terminal requests still fetch available actions so Reopen can appear when the API allows it. Transition comments are preserved as regular request comments when needed and are merged into the Activity timeline display. Transition load/apply failures show backend validation messages inline without navigating away.
+
+Milestone 4 outcome: Home KPI cards now load from the dedicated `GET /dashboard/summary/` endpoint through the shared Axios client, normalizing summary response fields into Open, In Progress, Due Today, and Overdue values. The old four-call `/requests/` count fan-out was removed, and summary failures now show a clear error instead of demo KPI fallback values.

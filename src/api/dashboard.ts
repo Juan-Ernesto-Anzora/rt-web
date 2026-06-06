@@ -60,6 +60,21 @@ type RequestListDto = {
   count?: number;
 };
 
+type DashboardSummaryDto = {
+  open?: number;
+  open_count?: number;
+  in_progress?: number;
+  inProgress?: number;
+  in_progress_count?: number;
+  due_today?: number;
+  dueToday?: number;
+  due_today_count?: number;
+  overdue?: number;
+  overdue_count?: number;
+  kpis?: DashboardSummaryDto;
+  counts?: DashboardSummaryDto;
+};
+
 type FlowDto = {
   flow_id?: string;
   name?: string;
@@ -126,11 +141,18 @@ function normalizeList(data: RequestListDto | RequestDto[]): DashboardListRespon
   };
 }
 
-async function getRequestCount(params: Record<string, string | number | boolean>) {
-  const response = await api.get<RequestListDto | RequestDto[]>("/requests/", {
-    params: { ...params, page: 1, page_size: 1 },
-  });
-  return normalizeList(response.data).count;
+function numberValue(...values: Array<number | undefined>) {
+  return values.find((value) => typeof value === "number" && Number.isFinite(value)) ?? 0;
+}
+
+function normalizeSummary(data: DashboardSummaryDto): DashboardSummary {
+  const source = data.kpis ?? data.counts ?? data;
+  return {
+    open: numberValue(source.open, source.open_count),
+    inProgress: numberValue(source.inProgress, source.in_progress, source.in_progress_count),
+    dueToday: numberValue(source.dueToday, source.due_today, source.due_today_count),
+    overdue: numberValue(source.overdue, source.overdue_count),
+  };
 }
 
 function paramsForList({ list, page = 1, pageSize = 10, sort = "-updated_at", quickFilter }: DashboardListParams) {
@@ -156,19 +178,8 @@ function paramsForList({ list, page = 1, pageSize = 10, sort = "-updated_at", qu
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const [open, inProgress, dueToday, overdue] = await Promise.all([
-    getRequestCount({ status_category: "open" }),
-    getRequestCount({ status_category: "in_progress" }),
-    getRequestCount({ due: "today" }),
-    getRequestCount({ overdue: true }),
-  ]);
-
-  return {
-    open,
-    inProgress,
-    dueToday,
-    overdue,
-  };
+  const response = await api.get<DashboardSummaryDto>("/dashboard/summary/");
+  return normalizeSummary(response.data);
 }
 
 export async function getDashboardRequests(params: DashboardListParams): Promise<DashboardListResponse> {

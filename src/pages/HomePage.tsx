@@ -50,9 +50,9 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: "unassigned", label: "Unassigned" },
 ];
 
-const FALLBACK_SUMMARY: DashboardSummary = {
-  open: 4,
-  inProgress: 2,
+const EMPTY_SUMMARY: DashboardSummary = {
+  open: 0,
+  inProgress: 0,
   dueToday: 0,
   overdue: 0,
 };
@@ -124,7 +124,7 @@ function filterFallbackRequests(tab: DashboardListKey, quickFilter: QuickFilter 
 
 export function HomePage() {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<DashboardSummary>(FALLBACK_SUMMARY);
+  const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardListKey>("my_tasks");
@@ -142,8 +142,7 @@ export function HomePage() {
       setSummary(nextSummary);
       setSummaryError(null);
     } catch {
-      setSummary(FALLBACK_SUMMARY);
-      setSummaryError("KPI filters are unavailable; showing demo fallback values.");
+      setSummaryError("Could not load dashboard summary from API.");
     } finally {
       setSummaryLoading(false);
     }
