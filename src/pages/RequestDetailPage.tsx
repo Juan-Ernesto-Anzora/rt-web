@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import { AxiosError } from "axios";
 import { useNavigate, useParams } from "react-router-dom";
-import { RequestActivityEvent, RequestDetail, getRequestDetailBundle } from "../api/requestDetail";
+import {
+  RequestActivityEvent,
+  RequestDetail,
+  RequestTransition,
+  applyRequestTransition,
+  getRequestDetailBundle,
+  listRequestTransitions,
+} from "../api/requestDetail";
 import { EmptyState } from "../components/common/EmptyState";
 import { ErrorState } from "../components/common/ErrorState";
 import { PriorityChip } from "../components/requests/PriorityChip";
@@ -12,6 +20,7 @@ const FALLBACK_DETAIL: RequestDetail = {
   title: "VPN not connecting",
   description: "User cannot connect after password rotation. VPN client reports invalid profile.",
   status: "Open",
+  statusIsTerminal: false,
   priority: "High",
   assignee: "Ana Gomez",
   requester: "Carlos Diaz",
@@ -56,6 +65,38 @@ const FALLBACK_ACTIVITY: RequestActivityEvent[] = [
 ];
 
 const ENABLE_DEMO_DETAIL_FALLBACK = import.meta.env.VITE_ENABLE_DEMO_DETAIL_FALLBACK === "true";
+
+type ApiErrorBody = {
+  code?: string;
+  message?: string;
+  detail?: string;
+  details?: Array<{ field?: string; message?: string }>;
+  [key: string]: unknown;
+};
+
+function formatApiError(error: unknown, fallback: string) {
+  const response = (error as AxiosError<ApiErrorBody>).response?.data;
+  if (!response) return fallback;
+
+  if (response.message) return response.message;
+  if (response.detail) return response.detail;
+  if (Array.isArray(response.details) && response.details.length > 0) {
+    return response.details
+      .map((detail) => (detail.field ? `${detail.field}: ${detail.message ?? "Invalid value."}` : detail.message))
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  const fieldErrors = Object.entries(response)
+    .filter(([key]) => !["code", "message", "detail", "details"].includes(key))
+    .flatMap(([key, value]) => {
+      if (Array.isArray(value)) return value.map((item) => `${key}: ${String(item)}`);
+      if (typeof value === "string") return [`${key}: ${value}`];
+      return [];
+    });
+
+  return fieldErrors.length > 0 ? fieldErrors.join(" ") : fallback;
+}
 
 function formatDate(value?: string) {
   if (!value || Number.isNaN(Date.parse(value))) return "-";
@@ -150,14 +191,32 @@ function AttachmentsSection({ detail, comments }: { detail: RequestDetail; comme
   );
 }
 
-function ActivitySection({ events }: { events: RequestActivityEvent[] }) {
-  if (events.length === 0) {
+function ActivitySection({ events, comments }: { events: RequestActivityEvent[]; comments: RequestComment[] }) {
+  const timelineEvents = useMemo(() => {
+    const commentEvents: RequestActivityEvent[] = comments
+      .filter((comment) => comment.body.trim())
+      .map((comment) => ({
+        id: `comment-${comment.id}`,
+        actorName: comment.authorName,
+        verb: "commented",
+        createdAt: comment.createdAt,
+        payload: comment.body,
+      }));
+
+    return [...events, ...commentEvents].sort((left, right) => {
+      const leftTime = Date.parse(left.createdAt);
+      const rightTime = Date.parse(right.createdAt);
+      return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime);
+    });
+  }, [comments, events]);
+
+  if (timelineEvents.length === 0) {
     return <EmptyState title="No activity yet." body="Request history will appear here." />;
   }
 
   return (
     <div className="space-y-3">
-      {events.map((event) => (
+      {timelineEvents.map((event) => (
         <div key={event.id} className="rounded-lg border border-neutral-200 bg-white p-3">
           <div className="flex items-center justify-between gap-3">
             <div className="text-sm text-neutral-900">
@@ -165,9 +224,95 @@ function ActivitySection({ events }: { events: RequestActivityEvent[] }) {
             </div>
             <time className="text-xs text-neutral-500">{formatDate(event.createdAt)}</time>
           </div>
-          {event.payload && <div className="mt-2 text-xs text-neutral-600">{event.payload}</div>}
+          {event.payload && <div className="mt-2 whitespace-pre-wrap text-xs text-neutral-600">{event.payload}</div>}
         </div>
       ))}
+    </div>
+  );
+}
+
+function TransitionActions({
+  transitions,
+  selectedTransitionId,
+  comment,
+  submitting,
+  loading,
+  error,
+  success,
+  onSelect,
+  onCommentChange,
+  onSubmit,
+  onRetry,
+}: {
+  transitions: RequestTransition[];
+  selectedTransitionId: string;
+  comment: string;
+  submitting: boolean;
+  loading: boolean;
+  error: string | null;
+  success: string | null;
+  onSelect(transitionId: string): void;
+  onCommentChange(comment: string): void;
+  onSubmit(): void;
+  onRetry(): void;
+}) {
+  if (loading) {
+    return <div className="text-sm text-neutral-500">Loading actions...</div>;
+  }
+
+  if (transitions.length === 0) {
+    return <EmptyState title="No actions available." body="Available workflow actions will appear here." />;
+  }
+
+  const selectedTransition = transitions.find((transition) => transition.id === selectedTransitionId);
+
+  return (
+    <div className="space-y-3">
+      {error && <ErrorState message={error} onRetry={onRetry} />}
+      {success && (
+        <div className="rounded-lg border border-primary-600 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700">
+          {success}
+        </div>
+      )}
+      <div className="grid gap-2">
+        {transitions.map((transition) => (
+          <button
+            key={transition.id}
+            type="button"
+            onClick={() => onSelect(transition.id)}
+            className={`rounded-lg border px-3 py-2 text-left text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${
+              selectedTransitionId === transition.id
+                ? "border-primary-600 bg-primary-50 text-primary-700"
+                : "border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50"
+            }`}
+          >
+            <span>{transition.label}</span>
+            {transition.toStatus && !transition.label.toLowerCase().includes(transition.toStatus.toLowerCase()) && (
+              <span className="ml-2 text-xs font-medium text-neutral-500">to {transition.toStatus}</span>
+            )}
+          </button>
+        ))}
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="transition-comment">
+          Comment{selectedTransition?.requiresComment ? <span className="text-danger-500"> *</span> : null}
+        </label>
+        <textarea
+          id="transition-comment"
+          value={comment}
+          onChange={(event) => onCommentChange(event.target.value)}
+          className="min-h-24 w-full resize-y rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-50"
+          placeholder="Add context for this workflow action."
+        />
+      </div>
+      <button
+        type="button"
+        className="btn btn-primary w-full"
+        onClick={onSubmit}
+        disabled={submitting || !selectedTransitionId}
+      >
+        {submitting ? "Applying" : selectedTransition?.isTerminal ? "Close Request" : "Apply Action"}
+      </button>
     </div>
   );
 }
@@ -182,6 +327,13 @@ export default function RequestDetailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [transitions, setTransitions] = useState<RequestTransition[]>([]);
+  const [transitionsLoading, setTransitionsLoading] = useState(false);
+  const [transitionsError, setTransitionsError] = useState<string | null>(null);
+  const [selectedTransitionId, setSelectedTransitionId] = useState("");
+  const [transitionComment, setTransitionComment] = useState("");
+  const [transitionSubmitting, setTransitionSubmitting] = useState(false);
+  const [transitionSuccess, setTransitionSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -220,6 +372,71 @@ export default function RequestDetailPage() {
       cancelled = true;
     };
   }, [requestId, loadAttempt]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadTransitions() {
+      if (!requestId || !detail) {
+        setTransitions([]);
+        setSelectedTransitionId("");
+        setTransitionsError(null);
+        return;
+      }
+
+      setTransitionsLoading(true);
+      try {
+        const nextTransitions = await listRequestTransitions(requestId);
+        if (cancelled) return;
+        setTransitions(nextTransitions);
+        setSelectedTransitionId((current) =>
+          current && nextTransitions.some((transition) => transition.id === current) ? current : nextTransitions[0]?.id ?? "",
+        );
+        setTransitionsError(null);
+      } catch (requestError) {
+        if (cancelled) return;
+        setTransitions([]);
+        setSelectedTransitionId("");
+        setTransitionsError(formatApiError(requestError, "Could not load workflow actions."));
+      } finally {
+        if (!cancelled) setTransitionsLoading(false);
+      }
+    }
+
+    loadTransitions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, loadAttempt, requestId]);
+
+  async function submitTransition() {
+    const selectedTransition = transitions.find((transition) => transition.id === selectedTransitionId);
+    if (!requestId || !selectedTransition) return;
+
+    if (selectedTransition.requiresComment && !transitionComment.trim()) {
+      setTransitionsError("A comment is required for this workflow action.");
+      return;
+    }
+
+    setTransitionSubmitting(true);
+    setTransitionsError(null);
+    setTransitionSuccess(null);
+    try {
+      await applyRequestTransition(requestId, {
+        transitionId: selectedTransition.id,
+        comment: transitionComment,
+      });
+      setTransitionComment("");
+      setSelectedTransitionId("");
+      setTransitionSuccess("Workflow action applied.");
+      setLoadAttempt((current) => current + 1);
+    } catch (requestError) {
+      setTransitionsError(formatApiError(requestError, "Could not apply the workflow action. Please try again."));
+    } finally {
+      setTransitionSubmitting(false);
+    }
+  }
 
   if (!detail && loading) {
     return <div className="p-6 text-sm text-neutral-500">Loading request detail...</div>;
@@ -284,12 +501,32 @@ export default function RequestDetailPage() {
           <section className="card p-4">
             <h2 className="text-lg font-semibold text-neutral-900">Activity</h2>
             <div className="mt-3">
-              <ActivitySection events={activity} />
+              <ActivitySection events={activity} comments={comments} />
             </div>
           </section>
         </div>
 
         <aside className="card h-fit space-y-4 p-4">
+          <section className="space-y-3 border-b border-neutral-200 pb-4">
+            <h2 className="text-sm font-semibold uppercase text-neutral-500">Workflow</h2>
+            <TransitionActions
+              transitions={transitions}
+              selectedTransitionId={selectedTransitionId}
+              comment={transitionComment}
+              submitting={transitionSubmitting}
+              loading={transitionsLoading}
+              error={transitionsError}
+              success={transitionSuccess}
+              onSelect={(transitionId) => {
+                setSelectedTransitionId(transitionId);
+                setTransitionsError(null);
+                setTransitionSuccess(null);
+              }}
+              onCommentChange={setTransitionComment}
+              onSubmit={submitTransition}
+              onRetry={() => setLoadAttempt((current) => current + 1)}
+            />
+          </section>
           <DetailField label="Status" value={detail.status} />
           <DetailField label="Priority" value={detail.priority} />
           <DetailField label="Assignee" value={detail.assignee} />
