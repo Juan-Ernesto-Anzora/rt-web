@@ -1,5 +1,10 @@
 import api from "../lib/api";
-import { RequestComment, RequestCommentAttachment, listRequestComments } from "../features/requestActivity";
+import {
+  RequestComment,
+  RequestCommentAttachment,
+  createRequestComment,
+  listRequestComments,
+} from "../features/requestActivity";
 
 export type RequestDetail = {
   id: string;
@@ -7,6 +12,7 @@ export type RequestDetail = {
   description: string;
   status: string;
   statusCategory?: string;
+  statusIsTerminal: boolean;
   priority: string;
   assignee: string;
   requester: string;
@@ -29,6 +35,20 @@ export type RequestDetailBundle = {
   detail: RequestDetail;
   comments: RequestComment[];
   activity: RequestActivityEvent[];
+};
+
+export type RequestTransition = {
+  id: string;
+  label: string;
+  toStatus?: string;
+  toStatusCategory?: string;
+  isTerminal: boolean;
+  requiresComment: boolean;
+};
+
+export type ApplyTransitionPayload = {
+  transitionId: string;
+  comment?: string;
 };
 
 type AttachmentDto = {
@@ -100,6 +120,22 @@ type ActivityResponseDto = {
   results?: ActivityDto[];
 };
 
+type TransitionDto = {
+  id?: string;
+  transition_id?: string;
+  name?: string;
+  label?: string;
+  to_status?: string | StatusDto | null;
+  to_status_name?: string;
+  is_terminal?: boolean;
+  requires_comment?: boolean;
+};
+
+type TransitionResponseDto = {
+  results?: TransitionDto[];
+  transitions?: TransitionDto[];
+};
+
 function normalizeAttachment(attachment: AttachmentDto): RequestCommentAttachment {
   return {
     id: attachment.id ?? attachment.attachmentid ?? crypto.randomUUID(),
@@ -126,6 +162,10 @@ function statusCategory(status?: string | StatusDto | null) {
   return status.category;
 }
 
+function statusIsTerminal(status?: string | StatusDto | null) {
+  return Boolean(status && typeof status !== "string" && status.is_terminal);
+}
+
 function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
   if (typeof user === "string") return user;
   return user?.display_name ?? user?.email ?? fallback ?? empty;
@@ -138,6 +178,7 @@ function normalizeDetail(detail: RequestDetailDto): RequestDetail {
     description: detail.description ?? "",
     status: displayStatus(detail.status, detail.statusid),
     statusCategory: statusCategory(detail.status),
+    statusIsTerminal: statusIsTerminal(detail.status),
     priority: detail.priority ?? "-",
     assignee: displayUser(detail.assignee, detail.assignee_name, "Unassigned"),
     requester: displayUser(detail.requester, detail.requester_name),
@@ -149,6 +190,22 @@ function normalizeDetail(detail: RequestDetailDto): RequestDetail {
   };
 }
 
+function normalizeTransition(transition: TransitionDto): RequestTransition {
+  const toStatus = displayStatus(transition.to_status, transition.to_status_name);
+  const isTerminal = Boolean(transition.is_terminal) || statusIsTerminal(transition.to_status);
+  return {
+    id: transition.transition_id ?? transition.id ?? "",
+    label:
+      transition.label ??
+      transition.name ??
+      (isTerminal ? "Close Request" : toStatus && toStatus !== "-" ? `Move to ${toStatus}` : "Apply Action"),
+    toStatus,
+    toStatusCategory: statusCategory(transition.to_status),
+    isTerminal,
+    requiresComment: Boolean(transition.requires_comment),
+  };
+}
+
 function normalizeActivity(activity: ActivityDto): RequestActivityEvent {
   return {
     id: activity.id ?? activity.activityid ?? crypto.randomUUID(),
@@ -157,6 +214,28 @@ function normalizeActivity(activity: ActivityDto): RequestActivityEvent {
     createdAt: activity.created_at ?? new Date().toISOString(),
     payload: activity.payload ? JSON.stringify(activity.payload) : undefined,
   };
+}
+
+export async function listRequestTransitions(requestId: string): Promise<RequestTransition[]> {
+  const response = await api.get<TransitionResponseDto | TransitionDto[]>(
+    `/requests/${encodeURIComponent(requestId)}/available-transitions/`,
+  );
+  const transitions = Array.isArray(response.data)
+    ? response.data
+    : response.data.transitions ?? response.data.results ?? [];
+  return transitions.map(normalizeTransition).filter((transition) => transition.id);
+}
+
+export async function applyRequestTransition(requestId: string, payload: ApplyTransitionPayload) {
+  const comment = payload.comment?.trim();
+  await api.post(`/requests/${encodeURIComponent(requestId)}/transition/`, {
+    transition_id: payload.transitionId,
+    comment_markdown: comment || undefined,
+  });
+
+  if (comment) {
+    await createRequestComment(requestId, comment, []);
+  }
 }
 
 export async function getRequestDetail(requestId: string): Promise<RequestDetail> {

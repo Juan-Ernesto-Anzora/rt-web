@@ -71,6 +71,28 @@ Implementation steps:
 
 Fetch available transitions, render actions, support optional transition comment, and refresh detail after success.
 
+Implementation steps:
+
+1. Extend `src/api/requestDetail.ts`:
+   - Export `RequestTransition`, `listRequestTransitions(requestId)`, and `applyRequestTransition(requestId, payload)`.
+   - Use the shared `src/lib/api.ts` Axios instance so `Authorization` and `X-Tenant` headers are included automatically.
+   - Fetch available workflow actions from `GET /requests/{request_id}/available-transitions/`.
+   - Apply the selected action with `POST /requests/{request_id}/transition/` using `transition_id` and optional `comment_markdown`.
+   - Normalize transition IDs, labels, destination status names/categories, terminal flags, and comment requirements.
+   - Never update workflow state by PATCHing the request detail endpoint; transition validation, status updates, optional comments, and activity events are handled by the workflow transition endpoint.
+2. Update `src/pages/RequestDetailPage.tsx`:
+   - Load transitions after real detail loads.
+   - Render compact workflow actions in the right sidebar.
+   - Support an optional transition comment and required-comment validation when the API marks a transition as requiring one.
+   - Always ask the API for available transitions, even when the current status is terminal, so backend-allowed actions such as Reopen can be shown.
+   - Refresh detail, transitions, comments, and activity after a successful transition.
+   - Mirror a submitted transition comment into the regular request comments flow when the transition response does not attach one, then include comments in the Activity timeline display.
+   - Show a clear error state on transition list or apply failures.
+3. Keep out of scope:
+   - Workflow builder/admin screens.
+   - Custom transition forms beyond one optional comment.
+   - Backend workflow changes.
+
 ### Milestone 4: Dashboard summary integration
 
 Replace multiple count calls with `GET /api/dashboard/summary/` when available.
@@ -100,6 +122,23 @@ Milestone 2 exact manual verification:
 13. Return Home and confirm the Home page `New Request` button also navigates to `/requests/new`.
 14. If the API returns validation errors, confirm they render inline or in a form-level error without navigating.
 
+Milestone 3 exact manual verification:
+
+1. Open an existing non-terminal request detail page at `/requests/{request_id}`.
+2. Confirm `GET /api/requests/{request_id}/available-transitions/` runs with `Authorization` and `X-Tenant` headers.
+3. Confirm available workflow actions render in the right sidebar.
+4. Select a non-terminal workflow action, optionally add a comment, and submit.
+5. Confirm `POST /api/requests/{request_id}/transition/` sends `transition_id` and optional `comment_markdown`.
+6. Confirm no `PATCH /api/requests/{request_id}/` is sent for workflow actions.
+7. Select a terminal/close transition when available and submit.
+8. Confirm close can include a comment in the transition `comment_markdown` payload.
+9. Confirm the detail page refreshes and shows the new status.
+10. Confirm the activity timeline records `status.changed` or `request.closed`.
+11. Confirm the request refreshes into the closed/terminal status and the workflow panel still loads available transitions.
+12. If the backend allows reopening, confirm a Reopen action appears on the closed request and can move the request back to an open status.
+13. Confirm an optional transition comment appears in the Comments section and the Activity timeline after refresh.
+14. Force or observe an API failure and confirm a clear inline error appears without navigating away.
+
 ## Acceptance criteria
 
 Request Detail exists; Create Request works; transition/close works; dashboard summary is consumed; profile/preferences exists; states are implemented; UI follows tokens; auth and X-Tenant headers are sent.
@@ -117,11 +156,24 @@ Milestone 2 acceptance criteria:
 - Home and Search rows navigate with `request.request_id`; rows without `request_id` do not navigate to `/requests/-`.
 - No attachment upload, transition, or close behavior is introduced in this milestone.
 
+Milestone 3 acceptance criteria:
+
+- Request Detail fetches available transitions for the current `request_id` through the shared Axios client.
+- The right sidebar renders transition actions without reintroducing placeholder alerts or old demo-only UI.
+- A selected transition can be submitted with optional comment text.
+- Required transition comments are validated client-side when the transition contract says they are required.
+- Successful transitions refresh the detail, comments, activity, and available actions.
+- Terminal/closed requests still fetch available transitions and show Reopen when the API allows it.
+- Transition load/apply failures show clear errors and keep the user on Request Detail.
+- Workflow actions call `POST /requests/{request_id}/transition/`; they never call `PATCH /requests/{request_id}/`.
+- Close actions can include a comment.
+- Activity is refreshed after transition so `status.changed`, `request.closed`, and user transition comments appear in the timeline.
+
 ## Progress
 
 - [x] Milestone 1 completed.
 - [x] Milestone 2 completed.
-- [ ] Milestone 3 completed.
+- [x] Milestone 3 completed.
 - [ ] Milestone 4 completed.
 - [ ] Milestone 5 completed.
 
@@ -140,6 +192,13 @@ Milestone 2 acceptance criteria:
 - 2026-05-30: Request Detail should treat the detail API response as authoritative. Comment or activity fetch failures can show empty sections, but a `200` detail response should still render real request data.
 - 2026-05-30: Detail responses now include nested `flow`, `status`, `requester`, and nullable `assignee` objects. Rendering those fields directly crashes React, so adapters must flatten them to display strings before JSX.
 - 2026-05-30: Home/Search list rows need a distinct `requestId` route key from the display `id`; using `id`, `human_id`, or `-` can route users to `/requests/-` or the wrong detail URL.
+- 2026-05-31: This web repo does not include an OpenAPI document; workflow UI follows the existing request subresource pattern already used by comments, attachments, and activity.
+- 2026-05-31: Request detail statuses include `is_terminal`; the frontend can use that flag to suppress further workflow actions after close.
+- 2026-06-06: Real Day 6 testing showed the status-derived PATCH fallback was wrong. The backend rejects `PATCH /requests/{request_id}/` with tenant validation such as `flow_id: Not found for this tenant`; workflow actions must use the workflow transition endpoint.
+- 2026-06-06: The API exposes `GET /requests/{request_id}/available-transitions/` for allowed actions and `POST /requests/{request_id}/transition/` for applying one selected `transition_id`.
+- 2026-06-06: Transition comments are sent as `comment_markdown`, not `comment`, and activity/status updates are backend workflow responsibilities.
+- 2026-06-06: Closed requests can still have backend-allowed available transitions such as Reopen, so the web must not suppress workflow loading merely because `status.is_terminal` is true.
+- 2026-06-06: The tested transition response accepted `comment_markdown`, but the activity payload still showed `comment_id: null`; the web needs to preserve the user's transition comment visibly by refreshing/including regular request comments in the timeline.
 
 ## Decision Log
 
@@ -154,7 +213,15 @@ Milestone 2 acceptance criteria:
 - 2026-05-30: Disable the Request Detail demo-data fallback by default. It is now available only when `VITE_ENABLE_DEMO_DETAIL_FALLBACK=true`; authenticated API flows show a clear error state instead.
 - 2026-05-30: Normalize nested request detail/list/search fields at API adapter boundaries. Components receive strings for flow, status, requester, and assignee, plus optional `statusCategory` for badge styling.
 - 2026-05-30: Keep table display IDs separate from route IDs. Home and Search route with `request_id` only and disable row activation when that value is missing.
+- 2026-05-31: Keep transition controls in the Request Detail right sidebar so lifecycle actions stay close to status, priority, assignee, and due-date context.
+- 2026-06-06: Use only the workflow endpoints for lifecycle changes: `GET /available-transitions/` and `POST /transition/`.
+- 2026-06-06: Store and submit the selected `transition_id`; do not derive or submit destination `status_id` from the web UI.
+- 2026-06-06: Surface backend validation messages from transition failures directly in the workflow panel.
+- 2026-06-06: Always fetch available transitions from the API for the current request, including terminal/closed requests, and let an empty API response decide whether no actions are available.
+- 2026-06-06: After a successful transition with comment text, create a regular request comment as a visibility fallback and merge comments into the Activity timeline display.
 
 ## Outcomes & Retrospective
 
 Milestone 2 outcome: `/requests/new` now exists as a protected full-page create flow. Top bar, left rail, and Home `New Request` actions navigate to it. The form validates title, description, flow ID, requester ID, and Open status ID before submission, sends `POST /requests/` through the shared Axios client, renders API/form errors without navigating, disables submit while posting, and navigates to `/requests/{request_id}` only when the API returns the public `request_id`. The payload now uses backend field names (`flow_id`, `status_id`, `requester_id`, `assignee_id`) and lowercase priority values. Request Detail loads real API data through the shared Axios client, normalizes nested detail objects into display strings, and no longer shows demo fallback messaging by default. Home and Search row navigation now use `request_id` instead of display IDs and avoid routing missing IDs to `/requests/-`. Create-time attachments, workflow transitions, and close behavior remain deferred to later milestones.
+
+Milestone 3 outcome: Request Detail now loads allowed workflow actions from `GET /requests/{request_id}/available-transitions/`, renders user-friendly labels based on `to_status.name`, stores the selected `transition_id`, applies it with `POST /requests/{request_id}/transition/` and optional `comment_markdown`, and refreshes detail/comments/activity/actions after success. Workflow actions no longer PATCH the request detail endpoint. Closed/terminal requests still fetch available actions so Reopen can appear when the API allows it. Transition comments are preserved as regular request comments when needed and are merged into the Activity timeline display. Transition load/apply failures show backend validation messages inline without navigating away.
