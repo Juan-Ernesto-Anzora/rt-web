@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { AxiosError } from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  RequestActivityEvent,
-  RequestDetail,
-  RequestTransition,
+  type RequestActivityEvent,
+  type RequestDetail,
+  type RequestTransition,
+  type TenantUser,
   applyRequestTransition,
   getRequestDetailBundle,
+  listTenantUsers,
   listRequestTransitions,
+  updateRequestAssignee,
 } from "../api/requestDetail";
 import { EmptyState } from "../components/common/EmptyState";
 import { ErrorState } from "../components/common/ErrorState";
@@ -22,6 +25,7 @@ const FALLBACK_DETAIL: RequestDetail = {
   status: "Open",
   statusIsTerminal: false,
   priority: "High",
+  assigneeId: "demo-assignee",
   assignee: "Ana Gomez",
   requester: "Carlos Diaz",
   flow: "IT Support",
@@ -317,6 +321,88 @@ function TransitionActions({
   );
 }
 
+function AssignmentControl({
+  currentAssignee,
+  currentAssigneeId,
+  users,
+  selectedAssigneeId,
+  loading,
+  saving,
+  error,
+  success,
+  onChange,
+  onSave,
+  onRetry,
+}: {
+  currentAssignee: string;
+  currentAssigneeId: string | null;
+  users: TenantUser[];
+  selectedAssigneeId: string;
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  success: string | null;
+  onChange(assigneeId: string): void;
+  onSave(): void;
+  onRetry(): void;
+}) {
+  const normalizedCurrentId = currentAssigneeId ?? "";
+  const hasChanged = selectedAssigneeId !== normalizedCurrentId;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="text-xs font-semibold uppercase text-neutral-500">Current Assignee</div>
+        <div className="mt-1 text-sm font-semibold text-neutral-900">{currentAssignee}</div>
+      </div>
+      {success && (
+        <div className="rounded-lg border border-primary-600 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700">
+          {success}
+        </div>
+      )}
+      <div>
+        <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="assignee-select">
+          Assign to
+        </label>
+        <select
+          id="assignee-select"
+          value={selectedAssigneeId}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={loading || saving}
+          className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-50 disabled:cursor-not-allowed disabled:bg-neutral-50 disabled:text-neutral-500"
+        >
+          <option value="">Unassigned</option>
+          {users.map((user) => (
+            <option key={user.id} value={user.id}>
+              {user.label}
+              {user.email && user.email !== user.label ? ` (${user.email})` : ""}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-neutral-500">
+          {loading ? "Loading tenant users..." : "Unassigned is saved as null."}
+        </p>
+        {error && (
+          <div className="mt-2 rounded-lg border border-danger-500 bg-white px-3 py-2 text-xs text-danger-500">
+            <div>{error}</div>
+            <button type="button" className="mt-1 font-semibold underline" onClick={onRetry}>
+              Retry
+            </button>
+          </div>
+        )}
+      </div>
+      <button
+        type="button"
+        className="btn btn-secondary w-full"
+        onClick={onSave}
+        disabled={loading || saving || !hasChanged}
+      >
+        {saving ? "Saving" : "Save Assignment"}
+      </button>
+    </div>
+  );
+}
+
 export default function RequestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -334,6 +420,14 @@ export default function RequestDetailPage() {
   const [transitionComment, setTransitionComment] = useState("");
   const [transitionSubmitting, setTransitionSubmitting] = useState(false);
   const [transitionSuccess, setTransitionSuccess] = useState<string | null>(null);
+  const [users, setUsers] = useState<TenantUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState("");
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [assignmentSuccess, setAssignmentSuccess] = useState<string | null>(null);
+  const [usersLoadAttempt, setUsersLoadAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -410,6 +504,36 @@ export default function RequestDetailPage() {
     };
   }, [detail, loadAttempt, requestId]);
 
+  useEffect(() => {
+    setSelectedAssigneeId(detail?.assigneeId ?? "");
+  }, [detail?.assigneeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadUsers() {
+      setUsersLoading(true);
+      try {
+        const nextUsers = await listTenantUsers();
+        if (cancelled) return;
+        setUsers(nextUsers);
+        setUsersError(null);
+      } catch (requestError) {
+        if (cancelled) return;
+        setUsers([]);
+        setUsersError(formatApiError(requestError, "Could not load tenant users."));
+      } finally {
+        if (!cancelled) setUsersLoading(false);
+      }
+    }
+
+    loadUsers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [usersLoadAttempt]);
+
   async function submitTransition() {
     const selectedTransition = transitions.find((transition) => transition.id === selectedTransitionId);
     if (!requestId || !selectedTransition) return;
@@ -435,6 +559,23 @@ export default function RequestDetailPage() {
       setTransitionsError(formatApiError(requestError, "Could not apply the workflow action. Please try again."));
     } finally {
       setTransitionSubmitting(false);
+    }
+  }
+
+  async function saveAssignment() {
+    if (!requestId) return;
+
+    setAssignmentSaving(true);
+    setAssignmentError(null);
+    setAssignmentSuccess(null);
+    try {
+      await updateRequestAssignee(requestId, selectedAssigneeId || null);
+      setAssignmentSuccess("Assignment updated.");
+      setLoadAttempt((current) => current + 1);
+    } catch (requestError) {
+      setAssignmentError(formatApiError(requestError, "Could not update assignment. Please try again."));
+    } finally {
+      setAssignmentSaving(false);
     }
   }
 
@@ -529,7 +670,29 @@ export default function RequestDetailPage() {
           </section>
           <DetailField label="Status" value={detail.status} />
           <DetailField label="Priority" value={detail.priority} />
-          <DetailField label="Assignee" value={detail.assignee} />
+          <section className="space-y-3 border-y border-neutral-200 py-4">
+            <h2 className="text-sm font-semibold uppercase text-neutral-500">Assignment</h2>
+            <AssignmentControl
+              currentAssignee={detail.assignee}
+              currentAssigneeId={detail.assigneeId}
+              users={users}
+              selectedAssigneeId={selectedAssigneeId}
+              loading={usersLoading}
+              saving={assignmentSaving}
+              error={assignmentError ?? usersError}
+              success={assignmentSuccess}
+              onChange={(assigneeId) => {
+                setSelectedAssigneeId(assigneeId);
+                setAssignmentError(null);
+                setAssignmentSuccess(null);
+              }}
+              onSave={saveAssignment}
+              onRetry={() => {
+                setAssignmentError(null);
+                setUsersLoadAttempt((current) => current + 1);
+              }}
+            />
+          </section>
           <DetailField label="Requester" value={detail.requester} />
           <DetailField label="Flow" value={detail.flow} />
           <DetailField label="Due Date" value={formatDate(detail.dueAt)} />

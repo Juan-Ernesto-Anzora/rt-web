@@ -14,6 +14,7 @@ export type RequestDetail = {
   statusCategory?: string;
   statusIsTerminal: boolean;
   priority: string;
+  assigneeId: string | null;
   assignee: string;
   requester: string;
   flow: string;
@@ -51,6 +52,13 @@ export type ApplyTransitionPayload = {
   comment?: string;
 };
 
+export type TenantUser = {
+  id: string;
+  label: string;
+  email?: string;
+  displayName?: string;
+};
+
 type AttachmentDto = {
   id?: string;
   attachmentid?: string;
@@ -76,6 +84,7 @@ type StatusDto = {
 };
 
 type UserDto = {
+  id?: string;
   user_id?: string;
   email?: string;
   display_name?: string;
@@ -93,6 +102,7 @@ type RequestDetailDto = {
   status?: string | StatusDto | null;
   statusid?: string;
   priority?: string;
+  assignee_id?: string | null;
   assignee?: string | UserDto | null;
   assignee_name?: string | null;
   requester?: string | UserDto | null;
@@ -136,6 +146,13 @@ type TransitionResponseDto = {
   transitions?: TransitionDto[];
 };
 
+type UserLookupResponseDto = {
+  results?: UserDto[];
+  users?: UserDto[];
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function normalizeAttachment(attachment: AttachmentDto): RequestCommentAttachment {
   return {
     id: attachment.id ?? attachment.attachmentid ?? crypto.randomUUID(),
@@ -171,6 +188,35 @@ function displayUser(user?: string | UserDto | null, fallback?: string | null, e
   return user?.display_name ?? user?.email ?? fallback ?? empty;
 }
 
+function displayAssignee(user?: string | UserDto | null, fallback?: string | null) {
+  if (!user) return readableDisplay(fallback) ?? "Unassigned";
+  if (typeof user === "string") return readableDisplay(user) ?? readableDisplay(fallback) ?? "Unassigned";
+  return user.display_name ?? user.email ?? readableDisplay(fallback) ?? "Unassigned";
+}
+
+function readableDisplay(value?: string | null) {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || UUID_PATTERN.test(trimmed)) return undefined;
+  return trimmed;
+}
+
+function userId(user?: string | UserDto | null, fallback?: string | null) {
+  if (typeof user === "string") return fallback ?? null;
+  return user?.user_id ?? user?.id ?? fallback ?? null;
+}
+
+function normalizeTenantUser(user: UserDto): TenantUser {
+  const id = user.user_id ?? user.id ?? "";
+  const label = user.display_name ?? user.email ?? user.employee_code ?? id;
+  return {
+    id,
+    label,
+    email: user.email,
+    displayName: user.display_name,
+  };
+}
+
 function normalizeDetail(detail: RequestDetailDto): RequestDetail {
   return {
     id: detail.request_id ?? detail.human_id ?? detail.humanid ?? detail.requestid ?? "-",
@@ -180,7 +226,8 @@ function normalizeDetail(detail: RequestDetailDto): RequestDetail {
     statusCategory: statusCategory(detail.status),
     statusIsTerminal: statusIsTerminal(detail.status),
     priority: detail.priority ?? "-",
-    assignee: displayUser(detail.assignee, detail.assignee_name, "Unassigned"),
+    assigneeId: userId(detail.assignee, detail.assignee_id),
+    assignee: displayAssignee(detail.assignee, detail.assignee_name),
     requester: displayUser(detail.requester, detail.requester_name),
     flow: displayFlow(detail.flow, detail.flow_name),
     dueAt: detail.due_at,
@@ -224,6 +271,18 @@ export async function listRequestTransitions(requestId: string): Promise<Request
     ? response.data
     : response.data.transitions ?? response.data.results ?? [];
   return transitions.map(normalizeTransition).filter((transition) => transition.id);
+}
+
+export async function listTenantUsers(): Promise<TenantUser[]> {
+  const response = await api.get<UserLookupResponseDto | UserDto[]>("/users/");
+  const users = Array.isArray(response.data) ? response.data : response.data.users ?? response.data.results ?? [];
+  return users.map(normalizeTenantUser).filter((user) => user.id);
+}
+
+export async function updateRequestAssignee(requestId: string, assigneeId: string | null): Promise<void> {
+  await api.patch(`/requests/${encodeURIComponent(requestId)}/`, {
+    assignee_id: assigneeId,
+  });
 }
 
 export async function applyRequestTransition(requestId: string, payload: ApplyTransitionPayload) {
