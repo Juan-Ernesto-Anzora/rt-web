@@ -206,6 +206,8 @@ Milestone 4 acceptance criteria:
 - [x] Milestone 2 completed.
 - [x] Milestone 3 completed.
 - [x] Milestone 4 completed.
+- [x] Sprint 2 demo assignment sidebar fix completed.
+- [x] Sprint 2 assignment user endpoint/display fix completed.
 - [ ] Milestone 5 completed.
 
 ## Surprises & Discoveries
@@ -232,6 +234,10 @@ Milestone 4 acceptance criteria:
 - 2026-06-06: The tested transition response accepted `comment_markdown`, but the activity payload still showed `comment_id: null`; the web needs to preserve the user's transition comment visibly by refreshing/including regular request comments in the timeline.
 - 2026-06-06: Home KPI loading was still implemented as four `/requests/` count queries. Day 7 replaces that with the dedicated dashboard summary endpoint.
 - 2026-06-06: The web repo has no local OpenAPI file, so the dashboard summary adapter accepts both snake_case and camelCase response names while pointing at the confirmed summary endpoint path.
+- 2026-06-06: Request Detail had display-only assignee text but not the assignee UUID needed to submit assignment changes. The detail adapter now preserves `assignee_id` while still rendering readable assignee names.
+- 2026-06-06: The existing tenant user lookup can feed a compact assignment dropdown; Unassigned must submit `assignee_id: null`, never an empty string.
+- 2026-06-08: The API exposes tenant users at `GET /users/`, not `/users/lookup/`; the assignment dropdown must use `/users/` and normalize either an array response or a paginated `results` response.
+- 2026-06-08: Current Assignee should be derived from `assignee.display_name` or `assignee.email`, with `Unassigned` as the safe fallback, so UUIDs, raw objects, and lookup errors do not appear as assignee text.
 
 ## Decision Log
 
@@ -254,6 +260,8 @@ Milestone 4 acceptance criteria:
 - 2026-06-06: After a successful transition with comment text, create a regular request comment as a visibility fallback and merge comments into the Activity timeline display.
 - 2026-06-06: Use `GET /dashboard/summary/` as the sole KPI source for Home summary cards; keep request list loading unchanged for this milestone.
 - 2026-06-06: Do not fall back to demo KPI values when the authenticated summary endpoint fails; show a clear error while keeping zero or last-known values.
+- 2026-06-06: Keep the assignment demo fix in the Request Detail sidebar and use the normal request partial update with `assignee_id`; this is a narrow lifecycle support control, not the full user profile/preferences milestone.
+- 2026-06-08: Use `GET /users/` for the Request Detail assignment user list and keep lookup failures scoped to a small dropdown error while preserving readable Current Assignee text.
 
 ## Outcomes & Retrospective
 
@@ -262,3 +270,5 @@ Milestone 2 outcome: `/requests/new` now exists as a protected full-page create 
 Milestone 3 outcome: Request Detail now loads allowed workflow actions from `GET /requests/{request_id}/available-transitions/`, renders user-friendly labels based on `to_status.name`, stores the selected `transition_id`, applies it with `POST /requests/{request_id}/transition/` and optional `comment_markdown`, and refreshes detail/comments/activity/actions after success. Workflow actions no longer PATCH the request detail endpoint. Closed/terminal requests still fetch available actions so Reopen can appear when the API allows it. Transition comments are preserved as regular request comments when needed and are merged into the Activity timeline display. Transition load/apply failures show backend validation messages inline without navigating away.
 
 Milestone 4 outcome: Home KPI cards now load from the dedicated `GET /dashboard/summary/` endpoint through the shared Axios client, normalizing summary response fields into Open, In Progress, Due Today, and Overdue values. The old four-call `/requests/` count fan-out was removed, and summary failures now show a clear error instead of demo KPI fallback values.
+
+Sprint 2 demo assignment fix outcome: Request Detail now loads tenant users from `GET /users/`, shows a compact assignee selector in the sidebar, saves selected users with `assignee_id`, saves Unassigned as `assignee_id: null`, and refreshes the detail after a successful assignment update. Loading, success, and backend error states are visible inline in the assignment panel.
