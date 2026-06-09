@@ -115,6 +115,17 @@ Implementation steps:
 
 Add profile/preferences route or panel from user menu with display name, email, employee code, tenant info, and placeholder theme/density controls.
 
+Implementation steps:
+
+1. Add a protected `/profile/preferences` route in `src/main.tsx`.
+2. Wire the `Profile & Preferences` user-menu item in `src/pages/App.tsx` to navigate to `/profile/preferences`.
+3. Add a small JWT-claim normalizer in `src/auth/userProfile.ts` for display name, email, employee code, and username.
+4. Add `src/pages/ProfilePreferencesPage.tsx` with:
+   - Read-only profile fields from JWT claims.
+   - Tenant info from the existing auth context.
+   - Placeholder theme, density, and email notification controls saved locally.
+   - Compact loading-free UI that does not invent unsupported API endpoints.
+
 ## Tests and verification
 
 Run `pnpm lint`, `pnpm typecheck`, and `pnpm build` where available. Manually verify login, Home, create request, detail, comment/upload, transition/close, search, profile, logout.
@@ -162,6 +173,19 @@ Milestone 4 exact manual verification:
 5. Confirm the Open, In Progress, Due Today, and Overdue KPI cards show values from the summary response.
 6. Force or observe a summary endpoint failure and confirm Home shows a clear dashboard summary error without demo KPI values.
 
+Milestone 5 exact manual verification:
+
+1. Log in with a valid tenant.
+2. Open the user menu in the top bar.
+3. Click `Profile & Preferences`.
+4. Confirm the app navigates to `/profile/preferences`.
+5. Confirm the page shows display name, email, employee code, username, and tenant where available.
+6. Confirm missing profile fields render as `Not provided`, not raw objects or debug values.
+7. Change theme, density, or email notification preference and click `Save Preferences`.
+8. Confirm the success state appears and the page remains usable after reload.
+9. Confirm no unsupported profile API request is sent.
+10. Confirm Back to Home returns to `/`.
+
 ## Acceptance criteria
 
 Request Detail exists; Create Request works; transition/close works; dashboard summary is consumed; profile/preferences exists; states are implemented; UI follows tokens; auth and X-Tenant headers are sent.
@@ -200,6 +224,15 @@ Milestone 4 acceptance criteria:
 - The old four-request KPI count fan-out is removed.
 - Summary load failures show a clear error and do not display demo fallback KPI values.
 
+Milestone 5 acceptance criteria:
+
+- `/profile/preferences` is protected.
+- `Profile & Preferences` in the user menu opens `/profile/preferences`.
+- Profile fields render from JWT claims and tenant auth context without raw objects or placeholder alerts.
+- Theme, density, and email notification controls are visible and can be saved locally.
+- The page follows the existing compact app UI style and focus-visible behavior.
+- No unsupported API endpoints are called for profile/preferences.
+
 ## Progress
 
 - [x] Milestone 1 completed.
@@ -208,7 +241,7 @@ Milestone 4 acceptance criteria:
 - [x] Milestone 4 completed.
 - [x] Sprint 2 demo assignment sidebar fix completed.
 - [x] Sprint 2 assignment user endpoint/display fix completed.
-- [ ] Milestone 5 completed.
+- [x] Milestone 5 completed.
 
 ## Surprises & Discoveries
 
@@ -238,6 +271,7 @@ Milestone 4 acceptance criteria:
 - 2026-06-06: The existing tenant user lookup can feed a compact assignment dropdown; Unassigned must submit `assignee_id: null`, never an empty string.
 - 2026-06-08: The API exposes tenant users at `GET /users/`, not `/users/lookup/`; the assignment dropdown must use `/users/` and normalize either an array response or a paginated `results` response.
 - 2026-06-08: Current Assignee should be derived from `assignee.display_name` or `assignee.email`, with `Unassigned` as the safe fallback, so UUIDs, raw objects, and lookup errors do not appear as assignee text.
+- 2026-06-08: The web repo has no confirmed current-user/profile endpoint. The user profile page can use JWT claims and the existing auth tenant context for Sprint 2 without inventing a new API contract.
 
 ## Decision Log
 
@@ -262,6 +296,8 @@ Milestone 4 acceptance criteria:
 - 2026-06-06: Do not fall back to demo KPI values when the authenticated summary endpoint fails; show a clear error while keeping zero or last-known values.
 - 2026-06-06: Keep the assignment demo fix in the Request Detail sidebar and use the normal request partial update with `assignee_id`; this is a narrow lifecycle support control, not the full user profile/preferences milestone.
 - 2026-06-08: Use `GET /users/` for the Request Detail assignment user list and keep lookup failures scoped to a small dropdown error while preserving readable Current Assignee text.
+- 2026-06-08: Implement Milestone 5 as a protected `/profile/preferences` page rather than a modal so it is direct-linkable and keeps the user menu behavior simple.
+- 2026-06-08: Store placeholder theme/density/email-notification choices in localStorage for the Sprint 2 demo; defer server-backed preference persistence until an API contract exists.
 
 ## Outcomes & Retrospective
 
@@ -272,3 +308,5 @@ Milestone 3 outcome: Request Detail now loads allowed workflow actions from `GET
 Milestone 4 outcome: Home KPI cards now load from the dedicated `GET /dashboard/summary/` endpoint through the shared Axios client, normalizing summary response fields into Open, In Progress, Due Today, and Overdue values. The old four-call `/requests/` count fan-out was removed, and summary failures now show a clear error instead of demo KPI fallback values.
 
 Sprint 2 demo assignment fix outcome: Request Detail now loads tenant users from `GET /users/`, shows a compact assignee selector in the sidebar, saves selected users with `assignee_id`, saves Unassigned as `assignee_id: null`, and refreshes the detail after a successful assignment update. Loading, success, and backend error states are visible inline in the assignment panel.
+
+Milestone 5 outcome: `/profile/preferences` now exists as a protected page from the user menu. It shows display name, email, employee code, username, and tenant from JWT/auth context where available, renders missing values as `Not provided`, and provides local placeholder controls for theme, density, and email notifications. The top bar no longer hardcodes the user label and instead uses the decoded profile display name when present.
