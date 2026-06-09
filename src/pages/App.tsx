@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AxiosError } from "axios";
 import { HomePage } from "./HomePage";
 import { useAuth } from "../auth/useAuth";
+import { getCurrentUserProfile } from "../auth/userProfile";
 import {
   filterLocalSearchResults,
   RequestSearchFilters,
@@ -93,9 +94,8 @@ const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
   },
 ];
 
-function UserMenu({ onLogout }: { onLogout(): void }) {
+function UserMenu({ onLogout, onProfile }: { onLogout(): void; onProfile(): void }) {
   const menuItems = [
-    "Profile & Preferences",
     "Keyboard Shortcuts",
     "Saved Views",
     "Notifications",
@@ -104,6 +104,13 @@ function UserMenu({ onLogout }: { onLogout(): void }) {
 
   return (
     <div className="absolute right-6 top-16 z-20 w-64 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+      <button
+        type="button"
+        onClick={onProfile}
+        className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+      >
+        Profile & Preferences
+      </button>
       {menuItems.map((label) => (
         <button
           key={label}
@@ -124,7 +131,19 @@ function UserMenu({ onLogout }: { onLogout(): void }) {
   );
 }
 
-function TopBar({ tenant, onNew, onLogout }: { tenant?: string | null; onNew(): void; onLogout(): void }) {
+function TopBar({
+  tenant,
+  userName,
+  onNew,
+  onLogout,
+  onProfile,
+}: {
+  tenant?: string | null;
+  userName: string;
+  onNew(): void;
+  onLogout(): void;
+  onProfile(): void;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -145,9 +164,9 @@ function TopBar({ tenant, onNew, onLogout }: { tenant?: string | null; onNew(): 
           aria-expanded={open}
         >
           <div className="h-8 w-8 rounded-full bg-primary-600" />
-          <span className="text-sm font-medium text-neutral-800">Ana Gomez</span>
+          <span className="text-sm font-medium text-neutral-800">{userName || "User"}</span>
         </button>
-        {open && <UserMenu onLogout={onLogout} />}
+        {open && <UserMenu onLogout={onLogout} onProfile={onProfile} />}
       </div>
     </header>
   );
@@ -518,16 +537,19 @@ function SearchView() {
 }
 
 export default function App({ initialView = "home" }: { initialView?: AppView }) {
-  const { tenant, logout } = useAuth();
+  const { token, tenant, logout } = useAuth();
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<AppView>(initialView);
+  const userProfile = getCurrentUserProfile(token);
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">
       <TopBar
         tenant={tenant}
+        userName={userProfile.displayName}
         onNew={() => navigate("/requests/new")}
         onLogout={logout}
+        onProfile={() => navigate("/profile/preferences")}
       />
       <div className="flex flex-1">
         <SideNav activeView={activeView} onNavigate={setActiveView} onNewRequest={() => navigate("/requests/new")} />

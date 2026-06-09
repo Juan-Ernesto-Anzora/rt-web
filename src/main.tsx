@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./auth/useAuth";
 import "./index.css";
 import App from "./pages/App";
 import Login from "./pages/Login";
+import ProfilePreferencesPage from "./pages/ProfilePreferencesPage";
 import RequestCreatePage from "./pages/RequestCreatePage";
 import RequestDetailPage from "./pages/RequestDetailPage";
 
@@ -42,6 +43,14 @@ const router = createBrowserRouter([
     element: (
       <Protected>
         <RequestDetailPage />
+      </Protected>
+    ),
+  },
+  {
+    path: "/profile/preferences",
+    element: (
+      <Protected>
+        <ProfilePreferencesPage />
       </Protected>
     ),
   },
