@@ -3,8 +3,22 @@ import {
   RequestComment,
   RequestCommentAttachment,
   createRequestComment,
+  listRequestAttachments,
   listRequestComments,
+  normalizeAttachment,
 } from "../features/requestActivity";
+import {
+  displayAssignee,
+  displayFlow,
+  displayStatus,
+  displayUser,
+  statusCategory,
+  statusIsTerminal,
+  userId,
+  type FlowDto,
+  type StatusDto,
+  type UserDto,
+} from "./requestDisplay";
 
 export type RequestDetail = {
   id: string;
@@ -62,34 +76,19 @@ export type TenantUser = {
 type AttachmentDto = {
   id?: string;
   attachmentid?: string;
+  attachment_id?: string;
   file_name?: string;
   filename?: string;
   size?: number;
+  sizebytes?: number;
+  size_bytes?: number;
   content_type?: string;
+  contenttype?: string;
   scan_status?: "pending" | "clean" | "blocked";
+  scanstatus?: "pending" | "clean" | "blocked";
   download_url?: string;
-};
-
-type FlowDto = {
-  flow_id?: string;
-  name?: string;
-  description?: string;
-};
-
-type StatusDto = {
-  status_id?: string;
-  name?: string;
-  category?: string;
-  is_terminal?: boolean;
-};
-
-type UserDto = {
-  id?: string;
-  user_id?: string;
-  email?: string;
-  display_name?: string;
-  employee_code?: string;
-  avatar_url?: string;
+  storageurl?: string;
+  storage_url?: string;
 };
 
 type RequestDetailDto = {
@@ -101,6 +100,8 @@ type RequestDetailDto = {
   description?: string;
   status?: string | StatusDto | null;
   statusid?: string;
+  status_name?: string;
+  status_category?: string;
   priority?: string;
   assignee_id?: string | null;
   assignee?: string | UserDto | null;
@@ -151,61 +152,6 @@ type UserLookupResponseDto = {
   users?: UserDto[];
 };
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function normalizeAttachment(attachment: AttachmentDto): RequestCommentAttachment {
-  return {
-    id: attachment.id ?? attachment.attachmentid ?? crypto.randomUUID(),
-    fileName: attachment.file_name ?? attachment.filename ?? "Attachment",
-    size: attachment.size ?? 0,
-    contentType: attachment.content_type,
-    scanStatus: attachment.scan_status,
-    downloadUrl: attachment.download_url,
-  };
-}
-
-function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
-  if (typeof flow === "string") return flow;
-  return flow?.name ?? fallback ?? "-";
-}
-
-function displayStatus(status?: string | StatusDto | null, fallback?: string) {
-  if (typeof status === "string") return status;
-  return status?.name ?? fallback ?? "-";
-}
-
-function statusCategory(status?: string | StatusDto | null) {
-  if (!status || typeof status === "string") return undefined;
-  return status.category;
-}
-
-function statusIsTerminal(status?: string | StatusDto | null) {
-  return Boolean(status && typeof status !== "string" && status.is_terminal);
-}
-
-function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
-  if (typeof user === "string") return user;
-  return user?.display_name ?? user?.email ?? fallback ?? empty;
-}
-
-function displayAssignee(user?: string | UserDto | null, fallback?: string | null) {
-  if (!user) return readableDisplay(fallback) ?? "Unassigned";
-  if (typeof user === "string") return readableDisplay(user) ?? readableDisplay(fallback) ?? "Unassigned";
-  return user.display_name ?? user.email ?? readableDisplay(fallback) ?? "Unassigned";
-}
-
-function readableDisplay(value?: string | null) {
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  if (!trimmed || UUID_PATTERN.test(trimmed)) return undefined;
-  return trimmed;
-}
-
-function userId(user?: string | UserDto | null, fallback?: string | null) {
-  if (typeof user === "string") return fallback ?? null;
-  return user?.user_id ?? user?.id ?? fallback ?? null;
-}
-
 function normalizeTenantUser(user: UserDto): TenantUser {
   const id = user.user_id ?? user.id ?? "";
   const label = user.display_name ?? user.email ?? user.employee_code ?? id;
@@ -222,8 +168,8 @@ function normalizeDetail(detail: RequestDetailDto): RequestDetail {
     id: detail.request_id ?? detail.human_id ?? detail.humanid ?? detail.requestid ?? "-",
     title: detail.title ?? "Untitled request",
     description: detail.description ?? "",
-    status: displayStatus(detail.status, detail.statusid),
-    statusCategory: statusCategory(detail.status),
+    status: displayStatus(detail.status, detail.status_name ?? detail.status_category ?? detail.statusid),
+    statusCategory: statusCategory(detail.status, detail.status_category),
     statusIsTerminal: statusIsTerminal(detail.status),
     priority: detail.priority ?? "-",
     assigneeId: userId(detail.assignee, detail.assignee_id),
@@ -313,12 +259,21 @@ export async function getRequestActivity(requestId: string): Promise<RequestActi
 
 export async function getRequestDetailBundle(requestId: string): Promise<RequestDetailBundle> {
   const detail = await getRequestDetail(requestId);
-  const [commentsResult, activityResult] = await Promise.allSettled([
+  const [commentsResult, attachmentsResult, activityResult] = await Promise.allSettled([
     listRequestComments(requestId),
+    listRequestAttachments(requestId),
     getRequestActivity(requestId),
   ]);
   const comments = commentsResult.status === "fulfilled" ? commentsResult.value : [];
+  const externalAttachments = attachmentsResult.status === "fulfilled" ? attachmentsResult.value : [];
   const activity = activityResult.status === "fulfilled" ? activityResult.value : [];
 
-  return { detail, comments, activity };
+  return {
+    detail: {
+      ...detail,
+      attachments: [...detail.attachments, ...externalAttachments],
+    },
+    comments,
+    activity,
+  };
 }

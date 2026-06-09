@@ -126,6 +126,17 @@ Implementation steps:
    - Placeholder theme, density, and email notification controls saved locally.
    - Compact loading-free UI that does not invent unsupported API endpoints.
 
+### Milestone 6: Sprint 2 hardening/demo pass
+
+Fix demo-blocking issues found during manual testing:
+
+1. Home search navigates immediately to `/search?q=<query>` from the current input value and includes a clear action.
+2. Search uses the authenticated API endpoint `GET /search/requests` and does not show local demo rows in real app flows.
+3. Home and Search rows normalize nested `status`, `assignee`, `requester`, and `flow` shapes and enrich rows from Request Detail when list/search responses only include IDs.
+4. Request Detail loads attachments from both detail payloads and `GET /requests/{request_id}/attachments/`.
+5. Request Detail exposes a comment/upload form that uses `POST /attachments/init`, PUTs files to pre-signed URLs, then calls `POST /attachments/finalize`.
+6. Authenticated flows show clear empty/error states instead of demo data fallbacks.
+
 ## Tests and verification
 
 Run `pnpm lint`, `pnpm typecheck`, and `pnpm build` where available. Manually verify login, Home, create request, detail, comment/upload, transition/close, search, profile, logout.
@@ -186,6 +197,18 @@ Milestone 5 exact manual verification:
 9. Confirm no unsupported profile API request is sent.
 10. Confirm Back to Home returns to `/`.
 
+Milestone 6 exact manual verification:
+
+1. From Home, type `vpn` and click Search.
+2. Confirm the app navigates immediately to `/search?q=vpn`.
+3. Confirm Search calls `GET /api/search/requests?q=vpn` with `Authorization` and `X-Tenant`.
+4. Confirm Search shows real API rows or a clear API error, never local demo rows.
+5. Confirm Home rows show status, assignee, requester, and flow as readable text where the API provides or detail enrichment can resolve them.
+6. Open a Request Detail page with attachments uploaded from API/Postman and confirm they render in Attachments.
+7. Add a comment with one or more files from Request Detail.
+8. Confirm the web calls `POST /api/attachments/init`, PUTs each file to its pre-signed URL, then calls `POST /api/attachments/finalize`.
+9. Confirm the detail page refreshes and shows the new grouped comment/attachments.
+
 ## Acceptance criteria
 
 Request Detail exists; Create Request works; transition/close works; dashboard summary is consumed; profile/preferences exists; states are implemented; UI follows tokens; auth and X-Tenant headers are sent.
@@ -233,6 +256,16 @@ Milestone 5 acceptance criteria:
 - The page follows the existing compact app UI style and focus-visible behavior.
 - No unsupported API endpoints are called for profile/preferences.
 
+Milestone 6 acceptance criteria:
+
+- Home search submits the current input value immediately and does not trigger delayed navigation after returning from detail.
+- Search uses `GET /search/requests` through the shared Axios client.
+- Search and Home do not show local demo rows for authenticated API failures.
+- Home/Search request rows never render raw objects and show readable status, assignee, requester, and flow where available.
+- Request Detail renders existing attachments from the API.
+- Request Detail supports grouped multi-file upload with an optional comment through init/upload/finalize.
+- Upload success refreshes detail, comments, attachments, and activity.
+
 ## Progress
 
 - [x] Milestone 1 completed.
@@ -242,6 +275,7 @@ Milestone 5 acceptance criteria:
 - [x] Sprint 2 demo assignment sidebar fix completed.
 - [x] Sprint 2 assignment user endpoint/display fix completed.
 - [x] Milestone 5 completed.
+- [x] Milestone 6 Sprint 2 hardening/demo pass completed.
 
 ## Surprises & Discoveries
 
@@ -272,6 +306,10 @@ Milestone 5 acceptance criteria:
 - 2026-06-08: The API exposes tenant users at `GET /users/`, not `/users/lookup/`; the assignment dropdown must use `/users/` and normalize either an array response or a paginated `results` response.
 - 2026-06-08: Current Assignee should be derived from `assignee.display_name` or `assignee.email`, with `Unassigned` as the safe fallback, so UUIDs, raw objects, and lookup errors do not appear as assignee text.
 - 2026-06-08: The web repo has no confirmed current-user/profile endpoint. The user profile page can use JWT claims and the existing auth tenant context for Sprint 2 without inventing a new API contract.
+- 2026-06-09: Search had two real-flow demo hazards: it still called `/search` instead of the confirmed `/search/requests` route, and it showed local fixture rows on API failure.
+- 2026-06-09: Request list and search responses can contain only public IDs for status/assignee/requester/flow; the web needs safe display normalizers plus detail enrichment to render readable names in Sprint 2 demos.
+- 2026-06-09: Existing attachments may be available through `GET /requests/{request_id}/attachments/` even when the detail payload does not embed them.
+- 2026-06-09: The current upload API is the global grouped flow: `POST /attachments/init`, PUT to pre-signed URLs, then `POST /attachments/finalize`; the older request-local presign endpoint is not the demo path.
 
 ## Decision Log
 
@@ -298,6 +336,10 @@ Milestone 5 acceptance criteria:
 - 2026-06-08: Use `GET /users/` for the Request Detail assignment user list and keep lookup failures scoped to a small dropdown error while preserving readable Current Assignee text.
 - 2026-06-08: Implement Milestone 5 as a protected `/profile/preferences` page rather than a modal so it is direct-linkable and keeps the user menu behavior simple.
 - 2026-06-08: Store placeholder theme/density/email-notification choices in localStorage for the Sprint 2 demo; defer server-backed preference persistence until an API contract exists.
+- 2026-06-09: Remove local demo fallback rows from authenticated Home/Search flows. API failures now leave rows empty and show clear errors.
+- 2026-06-09: Use a shared request display normalizer for nested/string/ID-ish status, assignee, requester, and flow fields so raw objects and UUIDs do not leak into tables.
+- 2026-06-09: Enrich Home/Search rows with Request Detail data when the list/search endpoint returns IDs only. If enrichment for one row fails, keep the base row instead of failing the whole page.
+- 2026-06-09: Keep grouped upload UI inside Request Detail Comments so comments and attachments are created as one visible conversation event.
 
 ## Outcomes & Retrospective
 
@@ -310,3 +352,5 @@ Milestone 4 outcome: Home KPI cards now load from the dedicated `GET /dashboard/
 Sprint 2 demo assignment fix outcome: Request Detail now loads tenant users from `GET /users/`, shows a compact assignee selector in the sidebar, saves selected users with `assignee_id`, saves Unassigned as `assignee_id: null`, and refreshes the detail after a successful assignment update. Loading, success, and backend error states are visible inline in the assignment panel.
 
 Milestone 5 outcome: `/profile/preferences` now exists as a protected page from the user menu. It shows display name, email, employee code, username, and tenant from JWT/auth context where available, renders missing values as `Not provided`, and provides local placeholder controls for theme, density, and email notifications. The top bar no longer hardcodes the user label and instead uses the decoded profile display name when present.
+
+Milestone 6 outcome: Sprint 2 hardening removed local search/dashboard demo fallbacks from authenticated flows, switched Search to `GET /search/requests`, synchronized Search state from the URL query, added Home search clear behavior, normalized request display fields through a shared helper, enriched Home/Search rows from Request Detail when needed, loaded Request Detail attachments from the attachments endpoint, and added visible grouped comment/file upload using the API init/upload/finalize flow.

@@ -16,7 +16,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { ErrorState } from "../components/common/ErrorState";
 import { PriorityChip } from "../components/requests/PriorityChip";
 import { StatusBadge } from "../components/requests/StatusBadge";
-import { RequestComment } from "../features/requestActivity";
+import { createRequestComment, RequestComment } from "../features/requestActivity";
 
 const FALLBACK_DETAIL: RequestDetail = {
   id: "RT-2025-001001",
@@ -155,6 +155,79 @@ function CommentsSection({ comments }: { comments: RequestComment[] }) {
           )}
         </article>
       ))}
+    </div>
+  );
+}
+
+function UploadSection({
+  comment,
+  files,
+  inputKey,
+  submitting,
+  error,
+  success,
+  onCommentChange,
+  onFilesChange,
+  onSubmit,
+}: {
+  comment: string;
+  files: File[];
+  inputKey: number;
+  submitting: boolean;
+  error: string | null;
+  success: string | null;
+  onCommentChange(comment: string): void;
+  onFilesChange(files: File[]): void;
+  onSubmit(): void;
+}) {
+  return (
+    <div className="space-y-3">
+      {error && (
+        <div className="rounded-lg border border-danger-500 bg-white px-3 py-2 text-sm font-semibold text-danger-500">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-primary-600 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700">
+          {success}
+        </div>
+      )}
+      <div>
+        <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="upload-comment">
+          Comment
+        </label>
+        <textarea
+          id="upload-comment"
+          value={comment}
+          onChange={(event) => onCommentChange(event.target.value)}
+          className="min-h-24 w-full resize-y rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-primary-600 focus:ring-2 focus:ring-primary-50"
+          placeholder="Add context for the uploaded files."
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="upload-files">
+          Attach files
+        </label>
+        <input
+          key={inputKey}
+          id="upload-files"
+          type="file"
+          multiple
+          onChange={(event) => onFilesChange(Array.from(event.target.files ?? []))}
+          className="block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-100 file:px-3 file:py-1 file:text-sm file:font-semibold file:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-50"
+        />
+        <div className="mt-1 text-xs text-neutral-500">
+          {files.length > 0 ? `${files.length} selected` : "Multiple files are grouped into one comment."}
+        </div>
+      </div>
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={onSubmit}
+        disabled={submitting || (!comment.trim() && files.length === 0)}
+      >
+        {submitting ? "Uploading" : "Add Comment / Upload"}
+      </button>
     </div>
   );
 }
@@ -428,6 +501,12 @@ export default function RequestDetailPage() {
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [assignmentSuccess, setAssignmentSuccess] = useState<string | null>(null);
   const [usersLoadAttempt, setUsersLoadAttempt] = useState(0);
+  const [uploadComment, setUploadComment] = useState("");
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadSubmitting, setUploadSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -579,6 +658,30 @@ export default function RequestDetailPage() {
     }
   }
 
+  async function submitUpload() {
+    if (!requestId) return;
+    if (!uploadComment.trim() && uploadFiles.length === 0) {
+      setUploadError("Add a comment or choose at least one file.");
+      return;
+    }
+
+    setUploadSubmitting(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      await createRequestComment(requestId, uploadComment.trim(), uploadFiles);
+      setUploadComment("");
+      setUploadFiles([]);
+      setUploadInputKey((current) => current + 1);
+      setUploadSuccess(uploadFiles.length > 0 ? "Upload submitted." : "Comment added.");
+      setLoadAttempt((current) => current + 1);
+    } catch (requestError) {
+      setUploadError(formatApiError(requestError, "Could not add comment or upload files. Please try again."));
+    } finally {
+      setUploadSubmitting(false);
+    }
+  }
+
   if (!detail && loading) {
     return <div className="p-6 text-sm text-neutral-500">Loading request detail...</div>;
   }
@@ -627,6 +730,27 @@ export default function RequestDetailPage() {
 
           <section className="card p-4">
             <h2 className="text-lg font-semibold text-neutral-900">Comments</h2>
+            <div className="mt-3 border-b border-neutral-200 pb-4">
+              <UploadSection
+                comment={uploadComment}
+                files={uploadFiles}
+                inputKey={uploadInputKey}
+                submitting={uploadSubmitting}
+                error={uploadError}
+                success={uploadSuccess}
+                onCommentChange={(value) => {
+                  setUploadComment(value);
+                  setUploadError(null);
+                  setUploadSuccess(null);
+                }}
+                onFilesChange={(files) => {
+                  setUploadFiles(files);
+                  setUploadError(null);
+                  setUploadSuccess(null);
+                }}
+                onSubmit={submitUpload}
+              />
+            </div>
             <div className="mt-3">
               <CommentsSection comments={comments} />
             </div>

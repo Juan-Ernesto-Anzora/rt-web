@@ -57,71 +57,6 @@ const EMPTY_SUMMARY: DashboardSummary = {
   overdue: 0,
 };
 
-const FALLBACK_REQUESTS: DashboardRequest[] = [
-  {
-    id: "RT-2025-001001",
-    requestId: "RT-2025-001001",
-    title: "VPN not connecting",
-    status: "Open",
-    priority: "High",
-    assignee: "Ana Gomez",
-    requester: "Carlos Diaz",
-    updatedAt: "2025-08-22T10:41:00Z",
-  },
-  {
-    id: "RT-2025-001002",
-    requestId: "RT-2025-001002",
-    title: "Email quota exceeded",
-    status: "In Progress",
-    priority: "Normal",
-    assignee: "Luis Perez",
-    requester: "Maria Lopez",
-    updatedAt: "2025-08-22T09:18:00Z",
-  },
-  {
-    id: "RT-2025-001003",
-    requestId: "RT-2025-001003",
-    title: "Printer F3 queue stuck",
-    status: "Waiting",
-    priority: "Low",
-    assignee: "-",
-    requester: "Nadia Flores",
-    updatedAt: "2025-08-21T17:02:00Z",
-  },
-  {
-    id: "RT-2025-001004",
-    requestId: "RT-2025-001004",
-    title: "VPN split tunneling",
-    status: "Closed",
-    priority: "Normal",
-    assignee: "Ana Gomez",
-    requester: "Rafael Cruz",
-    updatedAt: "2025-08-20T15:27:00Z",
-  },
-];
-
-function filterFallbackRequests(tab: DashboardListKey, quickFilter: QuickFilter | "") {
-  let requests = [...FALLBACK_REQUESTS];
-  if (tab === "my_tasks") requests = requests.filter((request) => request.assignee === "Ana Gomez");
-  if (tab === "other_tasks") requests = requests.filter((request) => request.assignee !== "Ana Gomez");
-  if (tab === "my_requests") requests = requests.filter((request) => request.requester === "Carlos Diaz");
-
-  if (quickFilter === "my_open") {
-    requests = requests.filter((request) => request.assignee === "Ana Gomez" && request.status !== "Closed");
-  }
-  if (quickFilter === "high_priority") {
-    requests = requests.filter((request) => request.priority.toLowerCase() === "high");
-  }
-  if (quickFilter === "closed") {
-    requests = requests.filter((request) => request.status === "Closed");
-  }
-  if (quickFilter === "unassigned") {
-    requests = requests.filter((request) => request.assignee === "-");
-  }
-
-  return requests;
-}
-
 export function HomePage() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
@@ -162,10 +97,9 @@ export function HomePage() {
       setRequestCount(response.count);
       setListError(null);
     } catch {
-      const fallbackRequests = filterFallbackRequests(activeTab, quickFilter);
-      setRequests(fallbackRequests);
-      setRequestCount(fallbackRequests.length);
-      setListError("Could not load dashboard from API. Showing local demo data.");
+      setRequests([]);
+      setRequestCount(0);
+      setListError("Could not load dashboard requests from API.");
     } finally {
       setListLoading(false);
     }
@@ -239,6 +173,13 @@ export function HomePage() {
         />
         <button type="submit" className="btn btn-primary">
           Search
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearch("")}
+          className="rounded-lg border border-neutral-300 px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
+        >
+          Clear
         </button>
       </form>
 
