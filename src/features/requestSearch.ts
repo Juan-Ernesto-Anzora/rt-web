@@ -1,4 +1,15 @@
 import api from "../lib/api";
+import { getRequestDetail } from "../api/requestDetail";
+import {
+  displayAssignee,
+  displayFlow,
+  displayStatus,
+  displayUser,
+  statusCategory,
+  type FlowDto,
+  type StatusDto,
+  type UserDto,
+} from "../api/requestDisplay";
 
 export type SearchFacetKey = "status" | "assignee" | "flow" | "tag";
 
@@ -22,6 +33,7 @@ export type RequestSearchResult = {
   status: string;
   statusCategory?: string;
   assignee: string;
+  requester: string;
   flow: string;
   tags: string[];
   updatedAt: string;
@@ -40,9 +52,15 @@ type SearchResultDto = {
   human_id?: string;
   title?: string;
   statusid?: string;
+  status_id?: string;
+  status_name?: string;
+  status_category?: string;
   status?: string | StatusDto | null;
+  assignee_id?: string | null;
   assignee?: string | UserDto | null;
   assignee_name?: string | null;
+  requester?: string | UserDto | null;
+  requester_name?: string | null;
   flow?: string | FlowDto | null;
   flow_name?: string;
   tags?: string[];
@@ -56,61 +74,45 @@ type SearchResponseDto = {
   count?: number;
 };
 
-type FlowDto = {
-  flow_id?: string;
-  name?: string;
-  description?: string;
-};
-
-type StatusDto = {
-  status_id?: string;
-  name?: string;
-  category?: string;
-  is_terminal?: boolean;
-};
-
-type UserDto = {
-  user_id?: string;
-  email?: string;
-  display_name?: string;
-  employee_code?: string;
-  avatar_url?: string;
-};
-
-function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
-  if (typeof flow === "string") return flow;
-  return flow?.name ?? fallback ?? "-";
-}
-
-function displayStatus(status?: string | StatusDto | null, fallback?: string) {
-  if (typeof status === "string") return status;
-  return status?.name ?? fallback ?? "-";
-}
-
-function statusCategory(status?: string | StatusDto | null) {
-  if (!status || typeof status === "string") return undefined;
-  return status.category;
-}
-
-function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
-  if (typeof user === "string") return user;
-  return user?.display_name ?? user?.email ?? fallback ?? empty;
-}
-
 function normalizeSearchResult(result: SearchResultDto): RequestSearchResult {
   const requestId = result.request_id ?? "";
   return {
     id: (result.human_id ?? result.humanid ?? requestId) || result.requestid || "-",
     requestId,
     title: result.title ?? "Untitled request",
-    status: displayStatus(result.status, result.statusid),
-    statusCategory: statusCategory(result.status),
-    assignee: displayUser(result.assignee, result.assignee_name, "Unassigned"),
+    status: displayStatus(result.status, result.status_name ?? result.status_category ?? result.statusid ?? result.status_id),
+    statusCategory: statusCategory(result.status, result.status_category),
+    assignee: displayAssignee(result.assignee, result.assignee_name),
+    requester: displayUser(result.requester, result.requester_name),
     flow: displayFlow(result.flow, result.flow_name),
     tags: result.tags ?? [],
     updatedAt: result.updated_at ?? "",
     snippet: result.snippet ?? result.highlight ?? "",
   };
+}
+
+async function enrichSearchResultsWithDetail(results: RequestSearchResult[]) {
+  return Promise.all(
+    results.map(async (result) => {
+      if (!result.requestId) return result;
+      try {
+        const detail = await getRequestDetail(result.requestId);
+        return {
+          ...result,
+          title: detail.title,
+          status: detail.status,
+          statusCategory: detail.statusCategory,
+          assignee: detail.assignee,
+          requester: detail.requester,
+          flow: detail.flow,
+          updatedAt: detail.updatedAt || result.updatedAt,
+          snippet: result.snippet || detail.description,
+        };
+      } catch {
+        return result;
+      }
+    }),
+  );
 }
 
 function appendListParam(params: URLSearchParams, key: string, values: string[]) {
@@ -135,50 +137,13 @@ export function buildSearchParams(filters: RequestSearchFilters) {
 }
 
 export async function searchRequests(filters: RequestSearchFilters): Promise<RequestSearchResponse> {
-  const response = await api.get<SearchResponseDto | SearchResultDto[]>("/search", {
+  const response = await api.get<SearchResponseDto | SearchResultDto[]>("/search/requests", {
     params: buildSearchParams(filters),
   });
   const results = Array.isArray(response.data) ? response.data : response.data.results ?? [];
+  const normalizedResults = results.map(normalizeSearchResult);
   return {
-    results: results.map(normalizeSearchResult),
+    results: await enrichSearchResultsWithDetail(normalizedResults),
     count: Array.isArray(response.data) ? results.length : response.data.count ?? results.length,
-  };
-}
-
-export function filterLocalSearchResults(
-  results: RequestSearchResult[],
-  filters: RequestSearchFilters,
-): RequestSearchResponse {
-  const query = filters.query.trim().toLowerCase();
-  const filtered = results.filter((result) => {
-    const haystack = [
-      result.id,
-      result.title,
-      result.status,
-      result.assignee,
-      result.flow,
-      result.tags.join(" "),
-      result.snippet,
-    ]
-      .join(" ")
-      .toLowerCase();
-    const updatedTime = Date.parse(result.updatedAt);
-    const fromTime = filters.updatedFrom ? Date.parse(filters.updatedFrom) : Number.NEGATIVE_INFINITY;
-    const toTime = filters.updatedTo ? Date.parse(`${filters.updatedTo}T23:59:59`) : Number.POSITIVE_INFINITY;
-
-    return (
-      (!query || haystack.includes(query)) &&
-      (filters.status.length === 0 || filters.status.includes(result.status)) &&
-      (filters.assignee.length === 0 || filters.assignee.includes(result.assignee)) &&
-      (filters.flow.length === 0 || filters.flow.includes(result.flow)) &&
-      (filters.tag.length === 0 || filters.tag.some((tag) => result.tags.includes(tag))) &&
-      (Number.isNaN(updatedTime) || (updatedTime >= fromTime && updatedTime <= toTime))
-    );
-  });
-
-  const start = (filters.page - 1) * filters.pageSize;
-  return {
-    results: filtered.slice(start, start + filters.pageSize),
-    count: filtered.length,
   };
 }

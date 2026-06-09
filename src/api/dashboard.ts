@@ -1,4 +1,15 @@
 import api from "../lib/api";
+import { getRequestDetail } from "./requestDetail";
+import {
+  displayAssignee,
+  displayFlow,
+  displayStatus,
+  displayUser,
+  statusCategory,
+  type FlowDto,
+  type StatusDto,
+  type UserDto,
+} from "./requestDisplay";
 
 export type DashboardRequest = {
   id: string;
@@ -43,10 +54,15 @@ type RequestDto = {
   human_id?: string;
   title?: string;
   statusid?: string;
+  status_id?: string;
+  status_name?: string;
+  status_category?: string;
   status?: string | StatusDto | null;
   priority?: string;
+  assignee_id?: string | null;
   assignee?: string | UserDto | null;
   assignee_name?: string | null;
+  requester_id?: string | null;
   requester?: string | UserDto | null;
   requester_name?: string | null;
   updated_at?: string;
@@ -75,62 +91,46 @@ type DashboardSummaryDto = {
   counts?: DashboardSummaryDto;
 };
 
-type FlowDto = {
-  flow_id?: string;
-  name?: string;
-  description?: string;
-};
-
-type StatusDto = {
-  status_id?: string;
-  name?: string;
-  category?: string;
-  is_terminal?: boolean;
-};
-
-type UserDto = {
-  user_id?: string;
-  email?: string;
-  display_name?: string;
-  employee_code?: string;
-  avatar_url?: string;
-};
-
-function displayFlow(flow?: string | FlowDto | null, fallback?: string) {
-  if (typeof flow === "string") return flow;
-  return flow?.name ?? fallback ?? "-";
-}
-
-function displayStatus(status?: string | StatusDto | null, fallback?: string) {
-  if (typeof status === "string") return status;
-  return status?.name ?? fallback ?? "-";
-}
-
-function statusCategory(status?: string | StatusDto | null) {
-  if (!status || typeof status === "string") return undefined;
-  return status.category;
-}
-
-function displayUser(user?: string | UserDto | null, fallback?: string | null, empty = "-") {
-  if (typeof user === "string") return user;
-  return user?.display_name ?? user?.email ?? fallback ?? empty;
-}
-
 function normalizeRequest(request: RequestDto): DashboardRequest {
   const requestId = request.request_id ?? "";
   return {
     id: (request.human_id ?? request.humanid ?? requestId) || request.requestid || "-",
     requestId,
     title: request.title ?? "Untitled request",
-    status: displayStatus(request.status, request.statusid),
-    statusCategory: statusCategory(request.status),
+    status: displayStatus(request.status, request.status_name ?? request.status_category ?? request.statusid ?? request.status_id),
+    statusCategory: statusCategory(request.status, request.status_category),
     priority: request.priority ?? "-",
-    assignee: displayUser(request.assignee, request.assignee_name, "Unassigned"),
+    assignee: displayAssignee(request.assignee, request.assignee_name),
     requester: displayUser(request.requester, request.requester_name),
     updatedAt: request.updated_at ?? "",
     flow: displayFlow(request.flow, request.flow_name),
     dueAt: request.due_at,
   };
+}
+
+async function enrichRequestsWithDetail(requests: DashboardRequest[]) {
+  const enriched = await Promise.all(
+    requests.map(async (request) => {
+      if (!request.requestId) return request;
+      try {
+        const detail = await getRequestDetail(request.requestId);
+        return {
+          ...request,
+          status: detail.status,
+          statusCategory: detail.statusCategory,
+          assignee: detail.assignee,
+          requester: detail.requester,
+          flow: detail.flow,
+          priority: detail.priority,
+          dueAt: detail.dueAt,
+          updatedAt: detail.updatedAt || request.updatedAt,
+        };
+      } catch {
+        return request;
+      }
+    }),
+  );
+  return enriched;
 }
 
 function normalizeList(data: RequestListDto | RequestDto[]): DashboardListResponse {
@@ -186,5 +186,9 @@ export async function getDashboardRequests(params: DashboardListParams): Promise
   const response = await api.get<RequestListDto | RequestDto[]>("/requests/", {
     params: paramsForList(params),
   });
-  return normalizeList(response.data);
+  const normalized = normalizeList(response.data);
+  return {
+    ...normalized,
+    results: await enrichRequestsWithDetail(normalized.results),
+  };
 }

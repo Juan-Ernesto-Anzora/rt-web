@@ -5,7 +5,6 @@ import { HomePage } from "./HomePage";
 import { useAuth } from "../auth/useAuth";
 import { getCurrentUserProfile } from "../auth/userProfile";
 import {
-  filterLocalSearchResults,
   RequestSearchFilters,
   RequestSearchResult,
   searchRequests,
@@ -35,64 +34,6 @@ const EMPTY_SEARCH_FILTERS: RequestSearchFilters = {
   pageSize: 25,
   sort: "-updated_at",
 };
-
-const FALLBACK_SEARCH_RESULTS: RequestSearchResult[] = [
-  {
-    id: "RT-2025-001001",
-    requestId: "RT-2025-001001",
-    title: "VPN not connecting",
-    status: "Open",
-    assignee: "Ana Gomez",
-    flow: "IT Support",
-    tags: ["vpn", "remote-access"],
-    updatedAt: "2025-08-22T10:41:00Z",
-    snippet: "User cannot connect after password rotation. VPN client reports invalid profile.",
-  },
-  {
-    id: "RT-2025-001002",
-    requestId: "RT-2025-001002",
-    title: "Email quota exceeded",
-    status: "In Progress",
-    assignee: "Luis Perez",
-    flow: "Messaging",
-    tags: ["email", "quota"],
-    updatedAt: "2025-08-22T09:18:00Z",
-    snippet: "Mailbox archive job requested before increasing quota.",
-  },
-  {
-    id: "RT-2025-001003",
-    requestId: "RT-2025-001003",
-    title: "Printer F3 queue stuck",
-    status: "Waiting",
-    assignee: "-",
-    flow: "Facilities",
-    tags: ["printer", "floor-3"],
-    updatedAt: "2025-08-21T17:02:00Z",
-    snippet: "Queue is blocked by a failed PDF job. Waiting for onsite confirmation.",
-  },
-  {
-    id: "RT-2025-001004",
-    requestId: "RT-2025-001004",
-    title: "VPN split tunneling",
-    status: "Closed",
-    assignee: "Ana Gomez",
-    flow: "IT Support",
-    tags: ["vpn", "policy"],
-    updatedAt: "2025-08-20T15:27:00Z",
-    snippet: "Policy updated and confirmed with the requester.",
-  },
-  {
-    id: "RT-2025-001005",
-    requestId: "RT-2025-001005",
-    title: "New hire access package",
-    status: "Open",
-    assignee: "Marta Ruiz",
-    flow: "Access Management",
-    tags: ["onboarding", "access"],
-    updatedAt: "2025-08-19T13:10:00Z",
-    snippet: "Manager requested CRM, finance dashboard, and building access.",
-  },
-];
 
 function UserMenu({ onLogout, onProfile }: { onLogout(): void; onProfile(): void }) {
   const menuItems = [
@@ -278,11 +219,12 @@ function SearchResultsTable({
 }) {
   return (
     <div className="card overflow-hidden">
-      <div className="grid grid-cols-[130px_1fr_112px_132px_130px_116px] border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-600">
+      <div className="grid grid-cols-[130px_1fr_112px_132px_132px_130px_116px] border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-600">
         <div>ID</div>
         <div>Request</div>
         <div>Status</div>
         <div>Assignee</div>
+        <div>Requester</div>
         <div>Flow</div>
         <div>Updated</div>
       </div>
@@ -295,7 +237,7 @@ function SearchResultsTable({
               if (result.requestId) onOpenRequest(result.requestId);
             }}
             disabled={!result.requestId}
-            className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="font-semibold text-neutral-800">{result.id}</div>
             <div className="min-w-0 pr-4">
@@ -317,6 +259,7 @@ function SearchResultsTable({
               </span>
             </div>
             <div className="truncate pr-4 text-neutral-700">{result.assignee}</div>
+            <div className="truncate pr-4 text-neutral-700">{result.requester}</div>
             <div className="truncate pr-4 text-neutral-700">{result.flow}</div>
             <div className="text-neutral-700">{result.updatedAt ? formatDate(result.updatedAt) : "-"}</div>
           </button>
@@ -335,22 +278,29 @@ function SearchView() {
     ...EMPTY_SEARCH_FILTERS,
     query: initialQuery,
   });
-  const [results, setResults] = useState<RequestSearchResult[]>(FALLBACK_SEARCH_RESULTS);
-  const [count, setCount] = useState(FALLBACK_SEARCH_RESULTS.length);
+  const [results, setResults] = useState<RequestSearchResult[]>([]);
+  const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const facetSource = results.length > 0 ? results : FALLBACK_SEARCH_RESULTS;
-  const statusValues = uniqueFacetValues(FALLBACK_SEARCH_RESULTS, "status");
-  const assigneeValues = uniqueFacetValues(facetSource, "assignee");
-  const flowValues = uniqueFacetValues(facetSource, "flow");
-  const tagValues = uniqueFacetValues(facetSource, "tag");
+  const statusValues = uniqueFacetValues(results, "status");
+  const assigneeValues = uniqueFacetValues(results, "assignee");
+  const flowValues = uniqueFacetValues(results, "flow");
+  const tagValues = uniqueFacetValues(results, "tag");
   const totalPages = Math.max(1, Math.ceil(count / filters.pageSize));
 
   useEffect(() => {
     let cancelled = false;
 
     async function runSearch() {
+      if (!submittedFilters.query.trim()) {
+        setResults([]);
+        setCount(0);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       try {
         const response = await searchRequests(submittedFilters);
@@ -360,11 +310,10 @@ function SearchView() {
         setError(null);
       } catch (requestError) {
         if (cancelled) return;
-        const localResponse = filterLocalSearchResults(FALLBACK_SEARCH_RESULTS, submittedFilters);
-        setResults(localResponse.results);
-        setCount(localResponse.count);
+        setResults([]);
+        setCount(0);
         const axiosError = requestError as AxiosError<{ detail?: string }>;
-        setError(axiosError.response?.data?.detail ?? "Showing local search data; API search is unavailable");
+        setError(axiosError.response?.data?.detail ?? "Could not load search results from API.");
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -378,6 +327,12 @@ function SearchView() {
       cancelled = true;
     };
   }, [submittedFilters]);
+
+  useEffect(() => {
+    const nextFilters = { ...EMPTY_SEARCH_FILTERS, query: initialQuery };
+    setFilters(nextFilters);
+    setSubmittedFilters(nextFilters);
+  }, [initialQuery]);
 
   function updateFilter<K extends keyof RequestSearchFilters>(key: K, value: RequestSearchFilters[K]) {
     setFilters((current) => ({ ...current, [key]: value, page: key === "page" ? current.page : 1 }));
@@ -492,13 +447,15 @@ function SearchView() {
         <div className="space-y-3">
           {loading && <div className="text-sm text-neutral-500">Searching requests...</div>}
           {error && !loading && (
-            <div className="rounded-lg border border-warning-500 bg-white px-4 py-3 text-sm text-neutral-800">
+            <div className="rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm text-danger-500">
               {error}
             </div>
           )}
-          {!loading && results.length === 0 && (
+          {!loading && !error && results.length === 0 && (
             <div className="card border-dashed p-6 text-sm text-neutral-600">
-              No requests matched the current search and facets.
+              {submittedFilters.query.trim()
+                ? "No requests matched the current search and facets."
+                : "Enter a keyword to search requests."}
             </div>
           )}
           {!loading && results.length > 0 && (
