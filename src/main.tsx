@@ -1,9 +1,12 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom";
+import { canAccessAdmin, getAuthzProfile } from "./auth/permissions";
 import { AuthProvider, useAuth } from "./auth/useAuth";
 import "./index.css";
 import App from "./pages/App";
+import AdminShellPage from "./pages/admin/AdminShellPage";
+import ForbiddenPage from "./pages/ForbiddenPage";
 import Login from "./pages/Login";
 import ProfilePreferencesPage from "./pages/ProfilePreferencesPage";
 import RequestCreatePage from "./pages/RequestCreatePage";
@@ -14,6 +17,19 @@ function Protected({ children }: { children: React.ReactNode }) {
   if (!token) {
     return <Navigate to="/login" replace />;
   }
+  return <>{children}</>;
+}
+
+function AdminProtected({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!canAccessAdmin(getAuthzProfile(token))) {
+    return <Navigate to="/403" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -52,6 +68,22 @@ const router = createBrowserRouter([
       <Protected>
         <ProfilePreferencesPage />
       </Protected>
+    ),
+  },
+  {
+    path: "/403",
+    element: (
+      <Protected>
+        <ForbiddenPage />
+      </Protected>
+    ),
+  },
+  {
+    path: "/admin/*",
+    element: (
+      <AdminProtected>
+        <AdminShellPage />
+      </AdminProtected>
     ),
   },
   {
