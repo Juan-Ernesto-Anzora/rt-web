@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AxiosError } from "axios";
 import { HomePage } from "./HomePage";
+import { canAccessAdmin, getAuthzProfile } from "../auth/permissions";
 import { useAuth } from "../auth/useAuth";
 import { getCurrentUserProfile } from "../auth/userProfile";
 import {
@@ -19,7 +20,7 @@ const NAV_ITEMS = [
   { id: "other", label: "Other Tasks" },
   { id: "requests", label: "My Requests" },
   { id: "search", label: "Search" },
-  { id: "settings", label: "Settings" },
+  { id: "admin", label: "Admin" },
 ];
 
 const EMPTY_SEARCH_FILTERS: RequestSearchFilters = {
@@ -115,16 +116,20 @@ function TopBar({
 
 function SideNav({
   activeView,
+  showAdmin,
   onNavigate,
+  onAdmin,
   onNewRequest,
 }: {
   activeView: AppView;
+  showAdmin: boolean;
   onNavigate(view: AppView): void;
+  onAdmin(): void;
   onNewRequest(): void;
 }) {
   return (
     <aside className="w-60 border-r border-neutral-200 bg-neutral-50 p-3">
-      {NAV_ITEMS.map((item) => {
+      {NAV_ITEMS.filter((item) => showAdmin || item.id !== "admin").map((item) => {
         const targetView: AppView | null = item.id === "search" ? "search" : item.id === "home" ? "home" : null;
         const isActive = targetView === activeView;
 
@@ -134,6 +139,7 @@ function SideNav({
             type="button"
             onClick={() => {
               if (item.id === "new") onNewRequest();
+              if (item.id === "admin") onAdmin();
               if (targetView) onNavigate(targetView);
             }}
             className={`mb-1 w-full px-4 py-2 text-left text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${
@@ -498,6 +504,7 @@ export default function App({ initialView = "home" }: { initialView?: AppView })
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<AppView>(initialView);
   const userProfile = getCurrentUserProfile(token);
+  const canOpenAdmin = canAccessAdmin(getAuthzProfile(token));
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">
@@ -509,7 +516,13 @@ export default function App({ initialView = "home" }: { initialView?: AppView })
         onProfile={() => navigate("/profile/preferences")}
       />
       <div className="flex flex-1">
-        <SideNav activeView={activeView} onNavigate={setActiveView} onNewRequest={() => navigate("/requests/new")} />
+        <SideNav
+          activeView={activeView}
+          showAdmin={canOpenAdmin}
+          onNavigate={setActiveView}
+          onAdmin={() => navigate("/admin")}
+          onNewRequest={() => navigate("/requests/new")}
+        />
         <main className="flex-1 space-y-4 p-6">{activeView === "search" ? <SearchView /> : <HomePage />}</main>
       </div>
     </div>
