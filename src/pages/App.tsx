@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AxiosError } from "axios";
 import { HomePage } from "./HomePage";
-import { canAccessAdmin, getAuthzProfile } from "../auth/permissions";
+import { useAdminPermission } from "../auth/adminPermissions";
 import { useAuth } from "../auth/useAuth";
 import { getCurrentUserProfile } from "../auth/userProfile";
 import {
@@ -504,7 +504,7 @@ export default function App({ initialView = "home" }: { initialView?: AppView })
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState<AppView>(initialView);
   const userProfile = getCurrentUserProfile(token);
-  const canOpenAdmin = canAccessAdmin(getAuthzProfile(token));
+  const { allowed: canOpenAdmin } = useAdminPermission(token, tenant);
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">

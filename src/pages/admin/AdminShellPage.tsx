@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { EmptyState } from "../../components/common/EmptyState";
+import WorkflowAdminPage from "./WorkflowAdminPage";
 
 type AdminSectionKey = "overview" | "workflows" | "users" | "roles";
 
@@ -91,14 +92,20 @@ export default function AdminShellPage() {
         </aside>
 
         <section className="card p-5">
-          <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
-          <p className="mt-2 text-sm text-neutral-700">{activeSection.body}</p>
-          <div className="mt-4">
-            <EmptyState
-              title={`${activeSection.label} setup pending.`}
-              body="This shell is ready for the next Sprint 3 configuration milestone."
-            />
-          </div>
+          {activeSection.key === "workflows" ? (
+            <WorkflowAdminPage />
+          ) : (
+            <>
+              <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
+              <p className="mt-2 text-sm text-neutral-700">{activeSection.body}</p>
+              <div className="mt-4">
+                <EmptyState
+                  title={`${activeSection.label} setup pending.`}
+                  body="This shell is ready for the next Sprint 3 configuration milestone."
+                />
+              </div>
+            </>
+          )}
         </section>
       </main>
     </div>
