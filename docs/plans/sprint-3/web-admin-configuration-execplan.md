@@ -101,7 +101,35 @@ Implementation steps:
 
 ### Milestone 2: Workflow list/detail/edit screens
 
-Future milestone. Add workflow list, status list, and transition view/edit screens after admin shell and guards are stable.
+User-visible outcome: an authorized admin can open Admin -> Workflows, select a tenant workflow, edit statuses, and add or update allowed transitions without leaving the admin shell.
+
+Implementation steps:
+
+1. Confirm the API contract for workflow administration:
+   - List workflows from `GET /api/admin/workflows/`.
+   - Load workflow detail from `GET /api/admin/workflows/{flow_id}/`.
+   - Create/update statuses through `/api/admin/workflows/{flow_id}/statuses/`.
+   - Create/update transitions through `/api/admin/workflows/{flow_id}/transitions/`.
+2. Add a workflow admin API client using the shared Axios client so `Authorization` and `X-Tenant` headers are included automatically.
+3. Replace the Workflows placeholder with a real Admin -> Workflows screen:
+   - Left workflow list.
+   - Workflow detail summary.
+   - Status editor.
+   - Transition editor.
+4. Normalize response shapes and never render raw API objects directly.
+5. Add client validation before status writes:
+   - Status names cannot be duplicated within a workflow.
+   - At least one `open` status is required.
+   - At least one `closed` or terminal status is required.
+6. Add client validation before transition writes:
+   - From status and To status are required.
+   - From and To statuses must differ.
+   - Duplicate From -> To transition pairs are blocked.
+7. Show loading, empty, success, and error states for workflow list/detail and editor saves.
+8. Keep out of scope:
+   - User and role admin screens.
+   - Backend API changes.
+   - Delete/archive actions not confirmed by the API contract.
 
 ### Milestone 3: User/membership screens
 
@@ -153,18 +181,26 @@ Negative/security verification:
 
 - `/admin` is registered and protected by authentication.
 - `/admin` is additionally protected by a permission-aware admin guard.
+- `/admin` verifies tenant-scoped admin authorization through `GET /api/admin/me/permissions/`.
 - Users without admin permission see a clear 403 page.
 - Admin users see a compact admin shell with Overview, Workflows, Users, and Roles & Permissions navigation.
 - The global app shell has an intentional Admin/Settings entry behavior.
 - Loading, empty, and error states are clear and consistent with existing common components.
 - No raw token, raw permission object, stack trace, or placeholder alert is shown to users.
 - Day 1-2 implementation touches only admin shell/guard-related files and this ExecPlan.
+- Admin -> Workflows loads tenant workflows from the admin API.
+- Selecting a workflow loads real workflow detail, statuses, and transitions.
+- Status editor can create and update statuses with duplicate/open/closed validation.
+- Transition editor can create and update transitions with required-field, self-transition, and duplicate-pair validation.
+- Workflow admin calls use the shared API client with auth and tenant headers.
+- Admin users with API permissions such as `admin.read` and `admin.workflows` can reach Admin -> Workflows even when those permissions are not embedded in JWT claims.
+- Day 3-4 implementation touches only workflow admin-related files and this ExecPlan.
 
 ## Progress
 
 - [x] Day 1-2 ExecPlan expanded for admin shell and route guards.
 - [x] Milestone 1 implemented.
-- [ ] Milestone 2 implemented.
+- [x] Milestone 2 implemented.
 - [ ] Milestone 3 implemented.
 - [ ] Milestone 4 implemented.
 - [ ] Milestone 5 implemented.
@@ -177,6 +213,12 @@ Negative/security verification:
 - 2026-06-10: The existing left rail has a `Settings` item that is not wired to a route; it is the likely Day 1-2 entry point for Admin/Configuration.
 - 2026-06-10: JWT permission claims are not yet guaranteed by the web repo. The admin guard recognizes common staff/admin role, permission, group, and scope claims and otherwise fails closed.
 - 2026-06-10: A local demo override can be enabled with `VITE_ENABLE_ADMIN_DEV_OVERRIDE=true`, but backend authorization remains authoritative for future admin API calls.
+- 2026-06-12: The API repo already exposes Sprint 3 admin workflow endpoints under `/api/admin/workflows/`, including workflow detail with embedded `statuses` and `transitions`.
+- 2026-06-12: Admin status writes use public fields `name`, `category`, and `is_terminal`; transition writes use `from_status_id`, `to_status_id`, `guard_roles_json`, `guard_perms_json`, and `auto_rules`.
+- 2026-06-12: The current admin workflow API exposes create/update for statuses and transitions, but no delete/archive endpoints, so delete actions stay out of scope for Day 3-4.
+- 2026-07-29: Manual testing showed an ACME admin user was redirected to `/403` before the web called the admin API. The API repo verification showed `/api/admin/me/permissions/` and `/api/admin/workflows/` return 200 for that user, so the denial was caused by web JWT-only authorization.
+- 2026-07-29: The API permission names include `admin.read`, `admin.workflows`, and `admin.audit.read`; the previous web JWT permission helper did not recognize `admin.read`.
+- 2026-07-29: The SQL Server MCP connection is configured but timed out to `host.docker.internal:1433`, so direct DB row validation was not available from this Codex session.
 
 ## Decision Log
 
@@ -186,7 +228,17 @@ Negative/security verification:
 - 2026-06-10: Keep backend authorization as authoritative. The frontend guard is for UX and route protection only.
 - 2026-06-10: Use the existing left rail location for an `Admin` entry and hide it for users who do not pass the decoded admin guard.
 - 2026-06-10: Keep the admin shell as route-based pages under `/admin/*` with placeholders only; workflow/user/role CRUD remains deferred.
+- 2026-06-12: Implement Admin -> Workflows against the dedicated `/api/admin/workflows/` endpoints rather than the public `/api/flows/` lookup endpoints, because this is configuration/admin behavior.
+- 2026-06-12: Validate duplicate status names and missing open/closed lifecycle states in the web UI before saving, while still preserving backend authorization and validation as authoritative.
+- 2026-06-12: Block duplicate and self-referential transition pairs client-side before POST/PATCH to keep transition editor feedback immediate.
+- 2026-07-29: Replace the `/admin/*` guard's JWT-only authorization check with an async call to `/api/admin/me/permissions/` using the shared tenant-aware API client. Backend RBAC is the source of truth for admin access.
+- 2026-07-29: Keep the explicit `VITE_ENABLE_ADMIN_DEV_OVERRIDE=true` escape hatch for local development only, but do not grant production admin access from JWT-only claims when the backend permission check fails.
+- 2026-07-29: Make the shared API client fall back to persisted auth/tenant localStorage values during direct page refreshes, so the first permission request still includes `Authorization` and `X-Tenant`.
 
 ## Outcomes & Retrospective
 
 Milestone 1 outcome: `/admin/*` now uses an `AdminProtected` route guard that requires authentication and decoded admin permission. Non-admin authenticated users are sent to `/403`, while unauthenticated users are sent to `/login`. The global shell shows an `Admin` left-rail entry only when the decoded profile can access admin. The admin shell includes Overview, Workflows, Users, and Roles & Permissions navigation with compact placeholder states for future milestones. A dedicated 403 page gives users a clear denied-access state and a path back to Home.
+
+Milestone 2 outcome: Admin -> Workflows now loads tenant workflows, shows selected workflow detail, renders existing statuses and transitions, and supports create/update actions for statuses and transitions through the admin API. The status editor validates duplicate names and required open/closed lifecycle coverage. The transition editor validates required endpoints, prevents self-transitions, and blocks duplicate From -> To pairs. Save actions show clear success/error feedback and refresh workflow detail after success.
+
+Milestone 2 verification fix outcome: Admin route access now verifies the active tenant through `/api/admin/me/permissions/` before rendering or denying `/admin/*`. This fixes the ACME admin case where API permissions were valid but the web redirected to `/403` because admin rights were not present as recognized JWT claims. The App left rail also uses the same API-backed permission state to decide whether to show Admin.

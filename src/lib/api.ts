@@ -8,6 +8,15 @@ const api = axios.create({
 let accessToken: string | null = null;
 let tenantCode: string | null = null;
 
+function readLocalStorage(key: string) {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
 export function setAuth(token: string | null, tenant: string | null) {
   accessToken = token;
   tenantCode = tenant;
@@ -15,8 +24,10 @@ export function setAuth(token: string | null, tenant: string | null) {
 
 api.interceptors.request.use((config) => {
   if (!config.headers) config.headers = {} as import("axios").AxiosRequestHeaders;
-  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
-  if (tenantCode) config.headers["X-Tenant"] = tenantCode;
+  const token = accessToken ?? readLocalStorage("access");
+  const tenant = tenantCode ?? readLocalStorage("tenant");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (tenant) config.headers["X-Tenant"] = tenant;
   return config;
 });
 

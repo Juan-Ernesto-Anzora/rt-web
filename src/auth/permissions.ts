@@ -34,7 +34,10 @@ const ADMIN_VALUES = new Set([
 const ADMIN_PERMISSIONS = new Set([
   "admin",
   "admin.access",
+  "admin.read",
   "admin.manage",
+  "admin.workflows",
+  "admin.audit.read",
   "configuration.manage",
   "workflows.manage",
   "users.manage",
@@ -85,6 +88,10 @@ export function getAuthzProfile(token: string | null): AuthzProfile {
 }
 
 export function canAccessAdmin(profile: AuthzProfile) {
-  if (import.meta.env.VITE_ENABLE_ADMIN_DEV_OVERRIDE === "true") return true;
+  if (hasAdminDevOverride()) return true;
   return profile.isAdmin;
+}
+
+export function hasAdminDevOverride() {
+  return import.meta.env.VITE_ENABLE_ADMIN_DEV_OVERRIDE === "true";
 }

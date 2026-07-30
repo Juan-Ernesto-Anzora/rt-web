@@ -1,8 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom";
-import { canAccessAdmin, getAuthzProfile } from "./auth/permissions";
+import { useAdminPermission } from "./auth/adminPermissions";
 import { AuthProvider, useAuth } from "./auth/useAuth";
+import { ErrorState } from "./components/common/ErrorState";
 import "./index.css";
 import App from "./pages/App";
 import AdminShellPage from "./pages/admin/AdminShellPage";
@@ -21,12 +22,29 @@ function Protected({ children }: { children: React.ReactNode }) {
 }
 
 function AdminProtected({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
+  const { token, tenant } = useAuth();
+  const { loading, allowed, error } = useAdminPermission(token, tenant);
   if (!token) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!canAccessAdmin(getAuthzProfile(token))) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-neutral-50 p-6">
+        <div className="card p-5 text-sm font-semibold text-neutral-700">Checking admin permissions...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-neutral-50 p-6">
+        <ErrorState message={error} onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
+
+  if (!allowed) {
     return <Navigate to="/403" replace />;
   }
 
