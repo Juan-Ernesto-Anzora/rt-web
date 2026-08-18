@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { EmptyState } from "../../components/common/EmptyState";
+import AdminRolesPage from "./AdminRolesPage";
+import AdminUsersPage from "./AdminUsersPage";
 import WorkflowAdminPage from "./WorkflowAdminPage";
 
 type AdminSectionKey = "overview" | "workflows" | "users" | "roles";
@@ -70,9 +72,9 @@ export default function AdminShellPage() {
         <p className="mt-1 text-sm text-neutral-600">Tenant configuration and permission-aware administration.</p>
       </header>
 
-      <main className="grid grid-cols-[260px_minmax(0,1fr)] gap-4 p-6">
+      <main className="grid gap-4 p-4 md:p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="card h-fit p-3">
-          <nav aria-label="Admin navigation" className="space-y-1">
+          <nav aria-label="Admin navigation" className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:block lg:space-y-1">
             {ADMIN_SECTIONS.map((section) => {
               const isActive = section.key === activeSection.key;
               return (
@@ -91,11 +93,15 @@ export default function AdminShellPage() {
           </nav>
         </aside>
 
-        <section className="card p-5">
+        <section className="min-w-0">
           {activeSection.key === "workflows" ? (
             <WorkflowAdminPage />
+          ) : activeSection.key === "users" ? (
+            <AdminUsersPage />
+          ) : activeSection.key === "roles" ? (
+            <AdminRolesPage />
           ) : (
-            <>
+            <div className="card p-5">
               <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
               <p className="mt-2 text-sm text-neutral-700">{activeSection.body}</p>
               <div className="mt-4">
@@ -104,7 +110,7 @@ export default function AdminShellPage() {
                   body="This shell is ready for the next Sprint 3 configuration milestone."
                 />
               </div>
-            </>
+            </div>
           )}
         </section>
       </main>
