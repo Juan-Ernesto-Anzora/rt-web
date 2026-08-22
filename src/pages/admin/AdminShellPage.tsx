@@ -1,11 +1,15 @@
 import { useMemo } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useAdminPermission } from "../../auth/adminPermissions";
+import { useAuth } from "../../auth/useAuth";
 import { EmptyState } from "../../components/common/EmptyState";
 import AdminRolesPage from "./AdminRolesPage";
+import AdminReportsPage from "./AdminReportsPage";
+import AdminSlaPage from "./AdminSlaPage";
 import AdminUsersPage from "./AdminUsersPage";
 import WorkflowAdminPage from "./WorkflowAdminPage";
 
-type AdminSectionKey = "overview" | "workflows" | "users" | "roles";
+type AdminSectionKey = "overview" | "workflows" | "users" | "roles" | "reports" | "sla";
 
 const ADMIN_SECTIONS: Array<{
   key: AdminSectionKey;
@@ -13,6 +17,7 @@ const ADMIN_SECTIONS: Array<{
   path: string;
   title: string;
   body: string;
+  permission?: string;
 }> = [
   {
     key: "overview",
@@ -42,6 +47,22 @@ const ADMIN_SECTIONS: Array<{
     title: "Role and permission matrix",
     body: "Role assignments and permission review will appear here after the role matrix milestone.",
   },
+  {
+    key: "reports",
+    label: "Reports",
+    path: "/admin/reports",
+    title: "Request reports",
+    body: "Review tenant request metrics and export the filtered request dataset.",
+    permission: "reports.read",
+  },
+  {
+    key: "sla",
+    label: "SLA Policies",
+    path: "/admin/sla",
+    title: "SLA policies",
+    body: "Configure tenant response and resolution targets by priority.",
+    permission: "sla.manage",
+  },
 ];
 
 function sectionFromPath(pathname: string) {
@@ -53,6 +74,10 @@ export default function AdminShellPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const activeSection = useMemo(() => sectionFromPath(location.pathname), [location.pathname]);
+  const { token, tenant } = useAuth();
+  const { context } = useAdminPermission(token, tenant);
+  const permissions = context?.permissions ?? [];
+  const visibleSections = ADMIN_SECTIONS.filter((section) => !section.permission || permissions.includes(section.permission));
 
   if (!activeSection) {
     return <Navigate to="/admin" replace />;
@@ -75,7 +100,7 @@ export default function AdminShellPage() {
       <main className="grid gap-4 p-4 md:p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="card h-fit p-3">
           <nav aria-label="Admin navigation" className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:block lg:space-y-1">
-            {ADMIN_SECTIONS.map((section) => {
+            {visibleSections.map((section) => {
               const isActive = section.key === activeSection.key;
               return (
                 <button
@@ -100,6 +125,10 @@ export default function AdminShellPage() {
             <AdminUsersPage />
           ) : activeSection.key === "roles" ? (
             <AdminRolesPage />
+          ) : activeSection.key === "reports" ? (
+            <AdminReportsPage />
+          ) : activeSection.key === "sla" ? (
+            <AdminSlaPage />
           ) : (
             <div className="card p-5">
               <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
