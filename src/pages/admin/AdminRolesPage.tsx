@@ -17,6 +17,7 @@ import { AdminDialog, ConfirmDialog } from "../../components/admin/AdminDialog";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingRows } from "../../components/common/LoadingRows";
+import { InlineNotice } from "../../components/common/InlineNotice";
 
 const CANONICAL_ROLES = new Set(["RT Admin", "RT Manager", "RT Agent", "RT Requester", "RT Viewer"]);
 type ConfirmState = { title: string; body: string; label: string; run(): Promise<void> } | null;
@@ -116,7 +117,7 @@ export default function AdminRolesPage() {
         <div><h2 className="text-lg font-semibold text-neutral-900">Roles and permissions</h2><p className="mt-1 text-sm text-neutral-600">Role configuration for tenant {tenant ?? "current"}.</p></div>
         <button type="button" onClick={() => setCreateOpen(true)} className="btn btn-primary">Create role</button>
       </div>
-      {notice ? <div role="status" className="rounded-lg border border-accent-500 bg-white px-4 py-3 text-sm font-semibold text-neutral-800">{notice}</div> : null}
+      {notice ? <InlineNotice message={notice} tone="success" /> : null}
       {error ? <ErrorState message={error} onRetry={() => void loadRoles()} /> : null}
       {loading ? <LoadingRows rows={5} /> : roles.length === 0 ? <EmptyState title="No tenant roles" body="Create a custom role or apply the canonical role seed for this tenant." /> : (
         <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">

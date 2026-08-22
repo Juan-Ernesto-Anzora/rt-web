@@ -11,6 +11,7 @@ import { ConfirmDialog } from "../../../components/admin/AdminDialog";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingRows } from "../../../components/common/LoadingRows";
+import { InlineNotice } from "../../../components/common/InlineNotice";
 
 const EVENT_DEFINITIONS = [
   { eventType: "request.created", label: "Request created" },
@@ -148,7 +149,7 @@ export default function NotificationTemplatesPanel({ canManage, onDirtyChange }:
   return <section aria-labelledby="notification-templates-title" className="space-y-4">
     <div><h3 id="notification-templates-title" className="text-lg font-semibold text-neutral-900">Notification templates</h3><p className="text-sm text-neutral-600">Plain-text tenant overrides. Inactive templates fall back to built-in notification text.</p></div>
     {error ? <ErrorState message={error} onRetry={() => selectedId ? void loadDetail(selectedId) : void loadList()} /> : null}
-    {notice ? <p role="status" className="rounded-lg border border-accent-500 bg-white p-3 text-sm font-semibold text-neutral-800">{notice}</p> : null}
+    {notice ? <InlineNotice message={notice} tone="success" /> : null}
     <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]"><nav aria-label="Notification event templates" className="h-fit space-y-1 rounded-lg border border-neutral-200 bg-white p-2">{EVENT_DEFINITIONS.map((definition) => {
       const template = templates.find((item) => item.eventType === definition.eventType);
       if (!template) return <div key={definition.eventType} className="px-3 py-2 text-sm text-danger-500">{definition.label}: missing</div>;

@@ -1,6 +1,6 @@
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm">
+    <div role="alert" aria-live="assertive" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm">
       <div className="font-semibold text-danger-500">{message}</div>
       {onRetry && (
         <button

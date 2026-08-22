@@ -10,6 +10,7 @@ import {
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingRows } from "../../../components/common/LoadingRows";
+import { InlineNotice } from "../../../components/common/InlineNotice";
 
 type GeneralKey = "web_base_url" | "default_timezone" | "default_page_size" | "email_from";
 type FieldErrors = Partial<Record<GeneralKey, string>>;
@@ -138,7 +139,7 @@ export default function GeneralSettingsPanel({ canRead, canWrite, onDirtyChange 
     <div><h3 id="general-settings-title" className="text-lg font-semibold text-neutral-900">General settings</h3><p className="text-sm text-neutral-600">Tenant defaults and notification delivery identity.</p></div>
     {!canWrite ? <p className="rounded-lg border border-warning-500 bg-white p-3 text-sm text-neutral-800">Read-only. Saving requires tenant.settings.manage permission.</p> : null}
     {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
-    {notice ? <p role="status" className="rounded-lg border border-accent-500 bg-white p-3 text-sm font-semibold text-neutral-800">{notice}</p> : null}
+    {notice ? <InlineNotice message={notice} tone="success" /> : null}
     {missing.length ? <EmptyState title="Settings configuration incomplete" body={`Missing: ${missing.map((item) => item.label).join(", ")}.`} /> : null}
     <form onSubmit={submit} className="rounded-lg border border-neutral-200 bg-white p-4">
       <div className="grid gap-4 md:grid-cols-2">{DEFINITIONS.map((definition) => {

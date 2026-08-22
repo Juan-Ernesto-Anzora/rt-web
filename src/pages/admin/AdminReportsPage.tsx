@@ -17,6 +17,7 @@ import { useAuth } from "../../auth/useAuth";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingRows } from "../../components/common/LoadingRows";
+import { InlineNotice } from "../../components/common/InlineNotice";
 
 const EMPTY_FILTERS: ReportFilters = {
   q: "", flowId: "", statusId: "", priority: "", requesterId: "", assigneeId: "",
@@ -158,7 +159,7 @@ export default function AdminReportsPage() {
         </button>
       </div>
       {!canExport ? <p className="rounded-lg border border-warning-500 bg-white p-3 text-sm text-neutral-800">CSV export requires reports.export permission.</p> : null}
-      {exportMessage ? <p role="status" className="rounded-lg border border-neutral-200 bg-white p-3 text-sm font-semibold text-neutral-700">{exportMessage}</p> : null}
+      {exportMessage ? <InlineNotice message={exportMessage} tone={exportMessage.startsWith("Downloaded") ? "success" : "error"} /> : null}
 
       <form onSubmit={apply} className="rounded-lg border border-neutral-200 bg-white p-4">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -190,9 +191,9 @@ function UserSelect({ label, value, users, onChange }: { label: string; value: s
 }
 
 function DateRange({ label, from, to, onFrom, onTo }: { label: string; from: string; to: string; onFrom(value: string): void; onTo(value: string): void }) {
-  return <fieldset className="rounded-lg border border-neutral-200 p-2"><legend className="px-1 text-sm font-semibold text-neutral-700">{label}</legend><div className="grid grid-cols-2 gap-2"><label className="text-xs text-neutral-600">From<input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className={inputClass()} /></label><label className="text-xs text-neutral-600">To<input type="date" value={to} min={from || undefined} onChange={(e) => onTo(e.target.value)} className={inputClass()} /></label></div></fieldset>;
+  return <fieldset className="rounded-lg border border-neutral-200 p-2"><legend className="px-1 text-sm font-semibold text-neutral-700">{label}</legend><div className="grid gap-2 sm:grid-cols-2"><label className="text-xs text-neutral-600">From<input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className={inputClass()} /></label><label className="text-xs text-neutral-600">To<input type="date" value={to} min={from || undefined} onChange={(e) => onTo(e.target.value)} className={inputClass()} /></label></div></fieldset>;
 }
 
 function Breakdown({ title, headers, rows }: { title: string; headers: string[]; rows: Array<Array<string | number>> }) {
-  return <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white"><h3 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">{title}</h3>{rows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="bg-neutral-50 text-neutral-700"><tr>{headers.map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr></thead><tbody className="divide-y divide-neutral-100">{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="hover:bg-neutral-50">{row.map((cell, cellIndex) => <td key={cellIndex} className="h-12 px-4 text-neutral-800">{cell}</td>)}</tr>)}</tbody></table></div> : <div className="p-4"><EmptyState title="No breakdown data" body="The API returned no values for the applied filters." /></div>}</section>;
+  return <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white"><h3 className="border-b border-neutral-200 px-4 py-3 font-semibold text-neutral-900">{title}</h3>{rows.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">{title}</caption><thead className="bg-neutral-50 text-neutral-700"><tr>{headers.map((header) => <th scope="col" key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr></thead><tbody className="divide-y divide-neutral-100">{rows.map((row, index) => <tr key={`${row[0]}-${index}`} className="hover:bg-neutral-50">{row.map((cell, cellIndex) => <td key={cellIndex} className="h-12 px-4 text-neutral-800">{cell}</td>)}</tr>)}</tbody></table></div> : <div className="p-4"><EmptyState title="No breakdown data" body="The API returned no values for the applied filters." /></div>}</section>;
 }

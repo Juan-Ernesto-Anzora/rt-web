@@ -10,15 +10,29 @@ type AdminDialogProps = {
 
 export function AdminDialog({ open, title, description, children, onClose }: AdminDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const descriptionId = useId();
 
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
+    if (open && !dialog.open) {
+      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      dialog.showModal();
+      window.requestAnimationFrame(() => {
+        const target = dialog.querySelector<HTMLElement>("[autofocus], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])");
+        target?.focus();
+      });
+    }
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  function handleClose() {
+    openerRef.current?.focus();
+    openerRef.current = null;
+    onClose();
+  }
 
   return (
     <dialog
@@ -27,10 +41,10 @@ export function AdminDialog({ open, title, description, children, onClose }: Adm
       aria-describedby={description ? descriptionId : undefined}
       onCancel={(event) => {
         event.preventDefault();
-        onClose();
+        ref.current?.close();
       }}
-      onClose={onClose}
-      className="m-auto w-[min(560px,calc(100%-2rem))] rounded-lg border border-neutral-200 bg-white p-0 shadow-lg backdrop:bg-neutral-900/40"
+      onClose={handleClose}
+      className="m-auto max-h-[calc(100vh-2rem)] w-[min(560px,calc(100%-2rem))] overflow-y-auto rounded-lg border border-neutral-200 bg-white p-0 shadow-lg backdrop:bg-neutral-900/40"
     >
       <div className="border-b border-neutral-200 px-5 py-4">
         <h2 id={titleId} className="text-lg font-semibold text-neutral-900">{title}</h2>

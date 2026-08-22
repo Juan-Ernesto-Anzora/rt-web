@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA/settings screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds a real-data reports experience, filtered CSV export, and SLA policy administration. Day 8 adds tenant general settings, feature flags, and safe plain-text notification-template administration against the implemented API contract.
+Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA/settings/audit screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds reports, export, and SLA administration. Day 8 adds tenant settings, feature flags, and plain-text notification-template administration. Day 9 is a release-preparation milestone: route-level error handling, removal of remaining demo fallbacks, accessibility/responsive consistency, the already-contracted Admin Audit UI, and minimal automated browser smoke coverage.
 
 ## Repository orientation
 
@@ -22,6 +22,11 @@ This plan applies to `rt-web`. Relevant files and expected Sprint 3 edit targets
 - `src/auth/adminPermissions.ts`: tenant-scoped permission context loaded from `GET /api/admin/me/permissions/`; Day 8 must use exact `admin.settings`, `tenant.settings.manage`, `featureflags.manage`, and `notifications.manage` codes.
 - `src/pages/admin/AdminShellPage.tsx`: existing route-aware Admin shell; Day 8 will add a permission-aware Settings destination and subsections.
 - `src/pages/admin/WorkflowAdminPage.tsx`: existing compact Admin loading, empty, save, and error-state patterns.
+- `src/pages/RequestDetailPage.tsx`: the only remaining authenticated local demo-data fallback and a fixed desktop two-column layout that must be removed/hardened for Day 9.
+- `src/components/admin/AdminDialog.tsx`: native-dialog wrapper that already has accessible title/description wiring but needs explicit initial-focus and opener-focus restoration verification.
+- `src/components/common/EmptyState.tsx`, `ErrorState.tsx`, and `LoadingRows.tsx`: existing primitives to harden with semantic announcements and reuse consistently.
+- `src/components/requests/StatusBadge.tsx`, `PriorityChip.tsx`, and `RequestTable.tsx`: existing request display primitives; Day 9 should consolidate status/badge use and make request tables semantic/responsive.
+- `.github/workflows/ci-web.yml`: current Web CI runs install, typecheck, ESLint, and build only; Day 9 will add a minimal Chromium Playwright smoke command after documenting the dependency.
 - `design/design-tokens.json`, `tailwind.config.ts`, and `src/index.css`: design token mappings and shared compact UI classes.
 - `src/pages/`: new admin shell, admin landing, and forbidden page files should live here unless a more specific `src/pages/admin/` folder is introduced.
 - `src/components/common/`: existing `EmptyState`, `ErrorState`, and `LoadingRows` components for consistent loading/error UI.
@@ -56,6 +61,16 @@ The adjacent API worktree `codex/feat-api-admin-settings` implements the Day 8 c
 - `GET /api/admin/feature-flags/` and `PATCH /api/admin/feature-flags/{key}/` require `featureflags.manage`. Keys are immutable and case-sensitive: `adminConsole`, `slaEnabled`, `exportsEnabled`, and `notificationTemplates`.
 - `GET /api/admin/notification-templates/`, `GET /api/admin/notification-templates/{template_id}/`, and `PATCH` of the detail route require `notifications.manage`. Event types are immutable and limited to `request.created`, `request.assigned`, `comment.added`, and `request.closed`.
 - Every operation also uses JWT, `X-Tenant`, active-tenant membership, and backend authorization. Cross-tenant or unknown flag/template identities return `404`; missing permissions return `403`.
+
+Day 9 repository inspection found these release gaps:
+
+- `src/main.tsx` uses flat `createBrowserRouter` routes with no root `errorElement`, no React error boundary, and no catch-all route. `/403` is friendly, but unmatched routes and unexpected render errors can expose React Router's developer error page.
+- `src/pages/RequestDetailPage.tsx` still contains `FALLBACK_DETAIL`, local comments/activity, and `VITE_ENABLE_DEMO_DETAIL_FALLBACK`. No other authenticated page injects local request/search/report/user/role/settings records. Home does initialize KPI values to zero, which can look like real data after a summary failure and should become an explicit unavailable state.
+- Home/Search request results use grid-styled button rows rather than semantic tables. Admin Users, Reports, and SLA already use real tables, but table heading scope/captions and shared pagination/status semantics are inconsistent.
+- `ErrorState` lacks `role="alert"`; `LoadingRows` has no `aria-busy`/loading announcement; success/error notices and pagination are duplicated across pages. Most controls have visible labels, but inline errors are not consistently connected with `aria-describedby`.
+- Request Detail uses `grid-cols-[minmax(0,1fr)_320px]` at every viewport. The Admin shell and most Admin pages already stack at `lg`/`xl`, but Users, Roles, Workflow, Reports, Settings, dialogs, tables, and action rows still need viewport verification and small overflow/focus fixes.
+- The existing API already supports `GET /api/admin/audit/` with `admin.audit.read`, pagination, and exact filters `type`, `actor_id`, `request_id`, `entity_id`, `created_from`, `created_to`, `page`, and `page_size`. Results expose `activity_id`, `request_id`, `actor_id`, `type`, raw `payload`, parsed `payload_json`, `entity_id`, `entity_type`, and `created_at`. The API does not return actor display names.
+- `package.json` and `pnpm-lock.yaml` contain no Playwright, Vitest, or Testing Library dependency or test script. CI has no browser job.
 
 ## Desired behavior
 
@@ -92,6 +107,13 @@ The completed Day 1-4 foundation and planned Day 5-6 directory UI should provide
 - Notification template editing uses exact API fields, a fixed allowed-placeholder reference, and plain-text preview with local sample values. Preview code never evaluates expressions or renders HTML, and backend validation remains authoritative.
 - Settings editors maintain a last-fetched snapshot. Save submits only normalized changed fields, Cancel restores the selected editor, Reset restores all fields in the current subsection to the last fetched server snapshot, and navigation/reload with unsaved changes requires confirmation. Reset does not mean factory defaults because no reset/default endpoint exists.
 - Every Day 8 screen has explicit loading, empty, retryable error, success, dirty, saving, and late-`403` states. Values and full template content are never written to console, telemetry, URLs, audit-facing client messages, or thrown error strings.
+- Normal navigation never shows React Router's default developer error surface. Authenticated users receive friendly, consistent 403, 404, and unexpected-error pages with safe recovery actions and no stack/error-object disclosure.
+- Authenticated production flows use API data or explicit loading/empty/error states only. No build flag can replace a failed request with local request/search/report/directory/configuration records.
+- High-use screens are keyboard-operable, announce loading/errors/success, use semantic tables/headings, preserve visible focus, label controls and icon actions, and pair every color state with readable text.
+- Admin Users, Roles/Permissions, Workflow, Reports, Settings, Audit, and Request Detail fit 320px mobile through desktop without page-level horizontal overflow, overlap, or inaccessible actions. Wide data tables may scroll within a labelled region.
+- Admin Audit is visible only with `admin.audit.read`, uses real paginated API records and supported filters, resolves actor labels from the tenant-user lookup when possible, links only to valid known entities, and renders payload details as escaped readable text/fields.
+- Shared badges, form fields, notices, loading/empty/error states, and pagination reduce behavior/style drift without a broad redesign or unrelated refactor.
+- A minimal Playwright Chromium suite covers Sprint 3 navigation and unauthorized behavior with deterministic API interception; a separate manual smoke pass validates the deployed API/database integration.
 
 ## Scope
 
@@ -161,6 +183,23 @@ Out of scope for Day 8:
 - Suppressing built-in notification events. An inactive template or disabled `notificationTemplates` flag disables only the custom database override; the API falls back to built-in notification text.
 - HTML/WYSIWYG template editing, raw HTML preview, executable expressions, remote preview calls, test-email sending, or adding new placeholders.
 - Factory-default reset, settings history, secret rotation, SMTP credentials, API changes, or applying the API SQL upgrade from the Web repository.
+
+In scope for Day 9 planning and subsequent implementation:
+
+- Root route error boundary/error element, friendly 403/404/unexpected pages, and catch-all routing.
+- Removal of all local authenticated data fallbacks and misleading placeholder values after API failure.
+- Focused accessibility and responsive fixes across the listed Sprint 3/request-detail workflows.
+- A permission-aware, paginated Admin Audit page using the existing API contract and supported filters only.
+- Small shared UI primitives where repeated behavior already exists: state badges, labelled form controls, notices, loading/error/empty states, and pagination.
+- One documented Playwright dependency and a minimal Chromium Web smoke suite for the required routes.
+
+Out of scope for Day 9:
+
+- New request lifecycle, workflow, report, SLA, settings, role, or notification capabilities.
+- New audit API fields, server-side actor expansion, new filter endpoints, audit export, audit mutation, or client-side reconstruction of missing audit data.
+- A design-system rewrite, new component framework, visual rebrand, charting, advanced analytics, cross-browser matrix, full regression suite, or broad unit-test migration.
+- Displaying raw stack traces, internal error objects, token/permission payloads, raw UUIDs as primary labels, unsanitized HTML, or sensitive setting/template values.
+- Treating mocked Playwright smoke tests as proof of full-stack API, tenancy, SQL, MinIO, Redis, MailHog, or permissions integration.
 
 ## Implementation plan
 
@@ -382,7 +421,70 @@ Save, reset, and unsaved changes:
 
 ### Milestone 7: UX hardening and tests
 
-Add focused Vitest/React Testing Library coverage when the repo test harness is present, plus browser/manual verification. Keep layout usable at mobile and desktop widths; verify focus trapping, Escape/cancel, initial focus, focus restoration, semantic labels, and no overlapping table/dialog content.
+User-visible outcome: Sprint 3 can be demonstrated and released without developer error pages, fake authenticated data, inaccessible state changes, broken mobile layouts, or untested Admin navigation. Authorized auditors can inspect real tenant audit history without adding a new API capability.
+
+Route-level failure handling:
+
+1. Refactor `src/main.tsx` to use one parent/root route with a production-safe `errorElement` for descendant render/loader errors and retain the existing `Protected`/`AdminProtected` behavior. Add an explicit `*` route for 404 so unmatched paths never reach React Router's default error page.
+2. Add reusable status-page presentation plus `src/pages/NotFoundPage.tsx` and `src/pages/RouteErrorPage.tsx`. Keep the existing `/403` copy/tenant context but align it with the same layout. Provide Home, Back, and Retry/Reload only where each action is valid.
+3. Use `isRouteErrorResponse`/`useRouteError` to distinguish route 403/404 from unexpected errors. Never render `error.message`, stack, response body, route internals, tokens, or permission objects. A safe generic reference generated client-side may be shown only if it contains no error data.
+4. Wrap `RouterProvider` in a small root React class error boundary, candidate `src/components/common/AppErrorBoundary.tsx`, for failures outside route rendering. Recovery clears no auth data automatically; offer reload and Home/login as context permits.
+5. Keep API errors local to their page/section. A normal `400/403/404/500` Axios response must not be thrown into the root boundary unless the route itself cannot render safely.
+
+Remove production demo/data substitutions:
+
+1. Delete `FALLBACK_DETAIL`, `FALLBACK_COMMENTS`, `FALLBACK_ACTIVITY`, `ENABLE_DEMO_DETAIL_FALLBACK`, and the fallback branch from `src/pages/RequestDetailPage.tsx`. Failed real detail loads render the existing clear error state and no request content.
+2. Search `src/`, environment examples, and docs for `demo`, `fallback`, `fake`, `mock`, and local record literals. Error-message fallback strings and safe empty labels are allowed; authenticated data replacement is not.
+3. Change Home summary state from hardcoded zero values to nullable/unavailable state. Loading may use skeletons; a failed summary shows an error and dashes/Unavailable, never plausible zero KPIs.
+4. Audit request/comment/activity normalizers that synthesize `crypto.randomUUID()` or current timestamps for API reads. Filter records missing required identity/timestamps or display Unknown/Unavailable without manufacturing server facts. Locally created optimistic records may exist only when clearly tied to a successful mutation response and must be replaced by refetch.
+5. Restrict or remove `VITE_ENABLE_ADMIN_DEV_OVERRIDE`. If retained for local development, require both `import.meta.env.DEV` and the explicit flag so a production build can never grant Admin UI access from the override.
+
+Shared accessibility and consistency hardening:
+
+1. Enhance `ErrorState` with `role="alert"`; enhance loading states with `aria-busy`, a screen-reader loading label, and shape-neutral responsive skeletons; keep `EmptyState` semantically neutral. Add a small shared `InlineNotice` for success/info/warning/error with `role="status"` or `role="alert"` and migrate repeated Admin notices.
+2. Add a shared `PaginationControls` accepting page, page size/count or API next/previous state, clear accessible names, disabled semantics, and a live page summary. Adopt it in Users, SLA, Search, and Audit without changing API pagination behavior.
+3. Consolidate repeated status UI around `StatusBadge`/a small generic state badge. Visible text such as Open, Inactive, Enabled, or Overdue remains present, so color is never the only state indicator. Keep priority text readable for all four values rather than using red alone for High.
+4. Convert Home and Search request grids to semantic tables with `<caption className="sr-only">`, `<thead>`, `<th scope="col">`, `<tbody>`, and a clearly named Open action/link. Preserve 48px rows, hover state, keyboard activation, and internal horizontal scrolling on narrow screens.
+5. Standardize form labels/helper/error linkage with a lightweight shared field wrapper or shared ID/error helper; do not rewrite every form. Prioritize Login, Admin Users, Workflow editors, Reports filters, SLA dialog, Settings, Audit filters, and Request Detail actions. Every `aria-invalid` control with an error gets `aria-describedby`.
+6. Harden `AdminDialog`: capture the opener, focus an explicit `autoFocus` control or first interactive element after `showModal`, keep native modal focus containment/Escape, and restore opener focus after close. Ensure destructive and unsaved-change dialogs have unique accessible names and disabled busy actions.
+7. Verify the global user menu has menu semantics, Escape/outside-close behavior, logical focus movement, and a clear accessible avatar/menu-button name. Do not implement unfinished menu destinations during polish.
+
+Responsive pass, using 320px, 768px, 1024px, and 1440px viewports:
+
+1. Global/Admin shell: prevent fixed left rail/top-bar content from forcing page overflow. Use a compact mobile navigation/menu or a labelled horizontally scrollable navigation band; retain the desktop rail. Long tenant/user labels truncate without hiding menu access.
+2. Admin Users: filters/actions wrap, the user table scrolls inside its own labelled container, pagination wraps, and user/membership detail stacks to one column with full-width controls on mobile.
+3. Roles/Permissions: role navigation stacks above detail before `lg`; permission matrix becomes one column; long permission codes wrap; dialogs/action rows remain reachable.
+4. Workflow Admin: workflow list stacks above status/transition editors; editor grid controls use full width on mobile; status/transition labels wrap; no action overlaps validation.
+5. Reports: filter grid/date ranges collapse predictably, KPI values remain stable, breakdown tables scroll internally, and Export/Apply/Clear buttons wrap without truncation.
+6. Settings: General fields, feature rows, template navigation/editor/preview, notices, and save/reset actions stack without viewport overflow; preview text wraps and scrolls inside its panel.
+7. Request Detail: change the fixed main/sidebar grid to one column by default and two columns only at `lg`; header/actions wrap; comments, attachments, activity payloads, workflow/assignment controls, and upload filenames do not force page overflow.
+8. Audit: filters stack, the table scrolls internally or switches to readable row blocks at narrow widths, details wrap, and pagination remains visible.
+
+Admin Audit UI using the implemented API contract:
+
+1. Add `src/api/adminAudit.ts` using `src/lib/api.ts`. Normalize the exact paginated response and omit malformed records that lack `activity_id`, `type`, or `created_at`; never generate substitute IDs/timestamps.
+2. Add `/admin/audit` to `AdminShellPage` only when permission context contains `admin.audit.read`/`canReadAudit`. A direct route without permission shows a local 403 state and does not break the Admin shell.
+3. Add `src/pages/admin/AdminAuditPage.tsx` with URL-backed filters for every API-supported field: event `type`, readable actor selector sending `actor_id`, request ID, entity ID, created-from/to, page, and page size. Convert calendar upper/lower bounds to explicit ISO datetimes and omit empty values.
+4. Resolve actor labels through the existing tenant `/users/` lookup once per page load. Display `display_name` then email; if the actor is absent, show Unknown actor. Keep `actor_id` internal except in an explicitly labelled advanced filter value already entered by the operator.
+5. Render a semantic paginated table with Event, Actor, Entity/Request, Timestamp, and Details. Convert dotted event types to readable title text while retaining the exact type in an optional secondary code label/filter value.
+6. Link requests to `/requests/{request_id}`. For known entity types, link only when the existing target screen can select that entity: user/membership to Users, role to Roles, workflow/status/transition through `flow_id` when available, SLA policy to SLA, and notification template to Settings. Add minimal URL selection support to those existing pages only when needed; otherwise show a readable entity type with no dead/misleading link.
+7. Render `payload_json` in a `<details>` disclosure with readable key/value rows. Primitive values become text; arrays/nested objects use escaped, wrapped text. If parsing failed, show Payload unavailable or a bounded plain-text raw payload only after confirming it contains no HTML rendering path. Never use `dangerouslySetInnerHTML`.
+8. Handle loading, empty, malformed payload, invalid filters, pagination, `403`, and retry independently. Do not infer missing actors/entities, fabricate event labels, or expose raw objects.
+
+Minimal Playwright dependency and smoke suite:
+
+1. Proposed dependency, documented here before installation: add only `@playwright/test` as a dev dependency and update `pnpm-lock.yaml`. Add `test:e2e` and `test:e2e:install` scripts; do not add Vitest/RTL in the same release-prep change.
+2. Add `playwright.config.ts` with Vite `webServer`, `http://127.0.0.1:5173` base URL, Chromium only, one worker in CI, trace on first retry, and screenshot on failure. Do not record videos or secrets by default.
+3. Add `tests/e2e/sprint3-admin-smoke.spec.ts` plus a small API-routing fixture. Intercept authentication and only the API contracts needed by each smoke path, returning explicit contract-shaped fixtures. Use a syntactically valid test JWT only for client routing; no production credentials or tokens enter source control.
+4. Minimum tests: admin login and navigation; Users page; Workflows page; Reports page; Settings page; unauthorized `/admin` behavior; friendly unknown-route 404. Assert page headings, key API request headers where observable, absence of React Router developer-error text, and no uncaught page errors.
+5. Keep mocked Web smoke clearly named/documented. Add a separate optional/manual environment-variable full-stack run for deployed API verification; do not make CI depend on SQL Server/MinIO/Redis/MailHog for this minimal suite.
+6. Update `.github/workflows/ci-web.yml` after dependency approval to install Chromium with dependencies and run `pnpm test:e2e` after lint/build. Preserve existing typecheck/lint/build gates.
+
+Release verification and scope control:
+
+1. Run `pnpm lint`, `pnpm build`, `pnpm test:e2e`, `pnpm tsc --noEmit`, and `git diff --check`. Record the existing non-interactive pnpm limitation if it recurs and run equivalent package scripts without claiming pnpm passed.
+2. Run keyboard-only and responsive manual passes for the named screens, then one real authenticated ACME smoke against deployed API/SQL. Check browser console and Network for uncaught errors, failed route chunks, missing auth/tenant headers, and demo-data requests.
+3. Keep Day 9 to polish, Audit UI, tests, and release documentation. If the diff exceeds the repository's preferred PR size, split Audit UI from shared polish/Playwright while preserving this single milestone's acceptance criteria.
 
 ## Tests and verification
 
@@ -498,6 +600,27 @@ Manual Day 8 verification:
 14. Make edits, then Cancel/Reset, switch template/tab, navigate Home, refresh, and close the browser tab. Confirm dirty-state prompts appear only when needed and discarded edits never leak into another tenant/template.
 15. Repeat at mobile and desktop widths with keyboard only. Verify tab order, focus-visible controls, accessible confirmation/dialog names, Escape/cancel behavior, no overlaps, and clear loading/empty/error/success states.
 
+Automated Day 9 verification:
+
+- Route tests: unknown URL renders friendly 404; a thrown descendant error renders the safe unexpected-error page; authenticated non-admin `/admin` renders/redirects to friendly 403; no page contains React Router's default `Unexpected Application Error`/developer detail.
+- Data tests through Playwright interception: Request Detail API failure shows no local request/comments/activity; Search/Reports/Users/Settings failures show no fixture/demo rows; Home summary failure does not show zero as a real KPI.
+- Accessibility smoke: run Playwright keyboard interactions for Admin nav, user table Open action, workflow selection, report Apply/Export controls, Settings forms, Audit filters/details, and dialog Escape/focus return. Assert important alerts/status regions and labelled controls by accessible role/name.
+- Responsive smoke: capture or assert no document-level horizontal overflow at 320x720 and 1440x900 for Users, Roles, Workflows, Reports, Settings, Audit, and Request Detail. Internal table/preview scrollers are allowed.
+- Audit smoke: mock paginated records plus users; assert readable event/actor/entity/timestamp, request link, expandable escaped payload, supported filters, pagination, empty state, and local `403` handling.
+- Run `pnpm tsc --noEmit`, `pnpm lint`, `pnpm build`, `pnpm test:e2e`, and `git diff --check`. CI runs the same commands with Chromium only.
+
+Manual Day 9 release smoke:
+
+1. Build production assets and serve them through Vite preview or the deployment-equivalent server. Open an unknown URL, `/403`, and a deliberately failing route/component test case; confirm friendly safe pages and no React Router developer screen/stack trace.
+2. With authenticated API requests forced to fail one family at a time, visit Home, Search, Request Detail, Reports, Users/Roles, and Settings. Confirm only loading/empty/error states appear and no local/demo/fake record or plausible zero metric replaces the failure.
+3. Use keyboard only from login through Admin navigation and each named screen. Confirm visible focus, logical order, labelled controls/buttons, table headers, announcements, modal Escape/focus restore, and no color-only status.
+4. Verify 320px, 768px, 1024px, and 1440px layouts for Users, Roles/Permissions, Workflow, Reports, Settings, Audit, and Request Detail. Confirm no page-level horizontal scrollbar, clipped action, overlap, or unreadable long value.
+5. Sign in with `admin.audit.read`, open `/admin/audit`, and confirm `GET /api/admin/audit/` sends Authorization/X-Tenant plus only applied filters. Compare count/order/fields to the API response, page forward/back, and inspect parsed/malformed payload handling.
+6. Verify actor names come from `/api/users/`, unknown actors remain readable without UUID labels, request links open `/requests/{request_id}`, and unsupported/unresolvable entities are not dead links.
+7. Repeat Audit without `admin.audit.read` and with a forced API `403`; confirm Audit navigation/action visibility is permission-aware and the rest of Admin remains usable.
+8. Run the Chromium smoke suite and inspect failures/traces. Then perform one real ACME full-stack path through login, Users, Workflows, Reports, Settings, Audit, and unauthorized access after the API/SQL deployment is ready.
+9. Confirm production browser console contains no uncaught errors/warnings caused by the app, Network contains no local/demo endpoint or missing tenant/auth header, and the release checklist records any backend deployment dependency separately.
+
 ## Acceptance criteria
 
 - `/admin` is registered and protected by authentication.
@@ -545,6 +668,17 @@ Manual Day 8 verification:
 - Template IDs/event types and setting/flag keys remain immutable. The Web exposes no create/delete/rename, HTML preview, executable syntax, factory reset, notification suppression, or demo fallback.
 - Save/Cancel/Reset and dirty-navigation protection work per setting family/template; successful writes replace snapshots from real API responses and failures preserve edits.
 - Day 8 calls preserve Authorization and `X-Tenant`, handle tenant changes and late `403/404`, and expose loading, empty, retryable error, saving, success, read-only, and responsive keyboard-accessible states.
+- Root routing has a safe `errorElement`/boundary and catch-all; friendly 403, 404, and unexpected-error pages replace React Router's developer page in normal use.
+- Request Detail contains no local demo records or fallback flag, and no authenticated page substitutes local/fake data or plausible KPI values after API failure.
+- Shared errors, loading states, notices, badges, form errors, and pagination expose consistent accessible semantics without a broad design rewrite.
+- Home/Search and Admin data tables have semantic headings/captions and keyboard-accessible row actions; errors/success/loading are announced and every status includes readable text.
+- Dialogs have accessible names, intentional initial focus, Escape behavior, focus containment, and opener focus restoration.
+- Users, Roles/Permissions, Workflow, Reports, Settings, Audit, and Request Detail work from 320px through desktop with no document-level overflow or overlapping controls.
+- `/admin/audit` is visible only with `admin.audit.read`, calls only `GET /api/admin/audit/`, supports all contracted filters/pagination, shows readable actors/events/entities/timestamps, and renders escaped expandable payload details.
+- Audit actor labels use tenant-user lookup data; unknown actors/entities remain readable and do not expose UUIDs as primary labels or create dead links.
+- `@playwright/test` is the only new Day 9 test dependency. Chromium smoke covers login/Admin navigation, Users, Workflows, Reports, Settings, unauthorized behavior, and 404 with deterministic contract-shaped API mocks.
+- CI retains typecheck/lint/build and adds the minimal Playwright smoke command; manual release verification separately covers the real deployed API/database.
+- Day 9 introduces no large product feature, API mutation, new backend contract, design-system replacement, or local/demo fallback.
 
 ## Progress
 
@@ -561,7 +695,10 @@ Manual Day 8 verification:
 - [x] Milestone 6 implemented in Web against the inspected Day 8 API contract.
 - [x] Day 8 TypeScript, ESLint, production build, and diff validation pass through the available npm package scripts.
 - [ ] Day 8 authenticated API/browser verification remains blocked until the API branch is committed/available and its SQL upgrade is applied to the development environment.
-- [ ] Milestone 7 implemented.
+- [x] Day 9 Milestone 7 planned after whole-application, API-audit-contract, responsive/accessibility, fallback, and test-stack inspection.
+- [x] Milestone 7 implemented with route/error hardening, no-demo production flows, shared accessibility/responsive polish, Admin Audit, Playwright smoke, CI, and release documentation.
+- [x] Day 9 typecheck, ESLint, production build, Chromium smoke, and diff validation pass through available npm package scripts.
+- [ ] Real authenticated ACME/API/SQL release smoke remains pending the API Sprint 3 polish merge/deployment and database upgrade application.
 
 ## Surprises & Discoveries
 
@@ -606,6 +743,19 @@ Manual Day 8 verification:
 - 2026-08-21: The API template allowlist is exactly eight plain placeholders and rejects traversal, indexing, conversions, format specifiers, malformed braces, multiline subjects, and unknown fields. A local preview can be useful but must remain non-authoritative and plain text.
 - 2026-08-21: React Router 7 exposes `useBlocker` in the existing data-router setup, so Day 8 can protect SPA navigation without adding a routing dependency; `beforeunload` separately covers refresh/tab close.
 - 2026-08-21: The Web package still has no Vitest/React Testing Library dependencies or test script. Day 8 keeps parsing and normalization in explicit functions and runs typecheck/lint/build, while the focused test-harness work remains in Milestone 7.
+- 2026-08-22: The router has neither `errorElement` nor a catch-all route. The existing `/403` is intentional, but 404/unexpected route failures can still expose React Router's default developer surface.
+- 2026-08-22: Request Detail is the only authenticated page still carrying actual local demo records, behind `VITE_ENABLE_DEMO_DETAIL_FALLBACK`. Search, Reports, Admin directory, and Settings contain no equivalent record substitution.
+- 2026-08-22: Home initializes KPI summary to zero, so an initial/failing API load can visually resemble a legitimate all-zero summary. Release polish needs nullable/unavailable KPI state rather than fabricated counts.
+- 2026-08-22: Some request activity/comment normalizers synthesize IDs or current timestamps when API fields are absent. These are not static demo rows, but they can manufacture server facts and should be narrowed to successful local mutation state or filtered read records.
+- 2026-08-22: The Admin Audit API is already sufficient for a Web UI: it is tenant-scoped, paginated, permissioned by `admin.audit.read`, returns parsed `payload_json` plus entity metadata, and validates type/actor/request/entity/date/page filters. No API change is required.
+- 2026-08-22: Audit records expose `actor_id` but not actor name/email. The public tenant `/users/` lookup is the only permission-compatible source of readable actor labels; inactive/removed actors may remain unresolved.
+- 2026-08-22: Playwright, Vitest, and Testing Library are absent from both `package.json` and `pnpm-lock.yaml`; Web CI currently runs only typecheck, ESLint, and build. A browser suite therefore requires a documented dependency and CI installation step.
+- 2026-08-22: Admin Users/Reports/SLA use semantic tables, while Home/Search use grid-shaped button rows. Shared Error/Loading/Pagination/Notice behavior is also inconsistent, so focused primitives give more release value than page-by-page cosmetic edits.
+- 2026-08-22: Request Detail is fixed to a desktop two-column grid at every viewport. Most Admin screens already have responsive `lg`/`xl` stacking and need verification/small overflow fixes rather than redesign.
+- 2026-08-22: The first Playwright login failure was a smoke fixture origin mismatch: Vite served Web at `127.0.0.1:5173` while `.env` sent API calls to `localhost:8000`. Intercepting all fetch/XHR requests fixed the test harness without changing application behavior.
+- 2026-08-22: Playwright strict accessible-name matching exposed ambiguous partial selectors (`Admin` within the user-menu label and `Settings` within `General settings`). Exact role/name selectors now make the smoke suite resilient and reinforce explicit accessible naming.
+- 2026-08-22: The 320px browser smoke passes for Users, Roles, Workflows, Reports, Settings, Audit, and Request Detail with no document-level horizontal overflow.
+- 2026-08-22: API `feat/api-admin-settings` is merged, but the expanded Audit payload/entity/filter contract remains on the unmerged API Sprint 3 polish worktree. Web Audit is implemented against that inspected contract and full integration remains a release gate.
 
 ## Decision Log
 
@@ -647,6 +797,14 @@ Manual Day 8 verification:
 - 2026-08-21: Never log configuration payloads or include values/template content in URL state. Dirty drafts live only in component state and are discarded on tenant change after confirmation.
 - 2026-08-21: Keep each Settings family in its own component and request/error boundary. A late `403` or missing-table failure in General, Flags, or Templates remains local and does not replace the Admin shell or the other sections.
 - 2026-08-21: Refresh each family from its GET endpoint after a successful PATCH rather than trusting local optimistic state or only the mutation response.
+- 2026-08-22: Use both a router-level `errorElement` and a root React error boundary, plus an explicit catch-all 404. Keep API failures local so the root boundary remains a last-resort render safety net.
+- 2026-08-22: Remove the Request Detail demo fallback entirely instead of adding another production guard. Restrict the unrelated Admin dev authorization override to `import.meta.env.DEV` if retained.
+- 2026-08-22: Treat null/Unavailable as the honest release state for missing KPI/API data. Do not synthesize IDs, timestamps, counts, actors, or entity links for server-read records.
+- 2026-08-22: Implement Admin Audit as a read-only Web surface against the existing contract. Resolve actor labels with tenant users and add only minimal URL selection support needed for valid entity links; omit links when a target cannot be resolved safely.
+- 2026-08-22: Render audit payload through escaped React text and semantic disclosures. Prefer parsed `payload_json`; never interpret payload/template content as HTML.
+- 2026-08-22: Add only `@playwright/test` for Day 9, Chromium-only. Use mocked API contracts for deterministic Web smoke in CI and keep real-stack release smoke manual/optional so the Web job does not require SQL Server or service containers.
+- 2026-08-22: Extract shared components only where behavior is already duplicated across at least three screens. Day 9 is hardening, not a design-system rewrite.
+- 2026-08-22: If release-polish plus Audit exceeds the preferred PR size, split the implementation into shared polish/Playwright and Admin Audit PRs while keeping both under Milestone 7.
 
 ## Outcomes & Retrospective
 
@@ -671,3 +829,11 @@ Day 7 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cm
 Day 8 outcome: `/admin/settings` now contains independently permissioned General Settings, Feature Flags, and Notification Templates sections backed by a typed shared-client module. General writes submit changed approved keys as one atomic batch; flags preserve exact case-sensitive keys and confirm enabled-to-disabled changes; template writes preserve immutable identity and preview exact allowed placeholders as plain text while leaving unknown placeholders unchanged and visibly invalid. Sensitive values never enter editable state, section-level `403` responses stay local, successful writes refetch server state, and dirty settings/templates block navigation. Authenticated API/browser verification remains pending until the API work and SQL upgrade are deployed.
 
 Day 8 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` pass. `pnpm lint` and `pnpm build` were attempted as requested, but this non-interactive Windows runtime aborted during pnpm dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` before either script ran. The generated `.pnpm-store` was removed. No automated test command exists in the current Web package; focused component coverage remains part of Milestone 7.
+
+Day 9 planning outcome: the whole Web application and completed Sprint 3 milestones were inspected for route failures, fallback data, accessibility semantics, responsive layout, shared UI drift, Audit contract coverage, and browser-test readiness. Milestone 7 now has implementation-ready route/error, no-demo, accessibility/responsive, Admin Audit, Playwright/CI, acceptance, and release-smoke steps. Only this ExecPlan changed; implementation remains unchecked.
+
+Milestone 7 outcome: routing now has a safe descendant `errorElement`, explicit friendly 404/403 pages, and a root render boundary used only for unexpected failures. Request Detail's demo objects/flag are deleted, Home KPI failures are unavailable instead of zero, production Admin override is development-only, and API-read activity/comments no longer receive fabricated IDs/timestamps. Known API failures remain local page states rather than being hidden by the boundary.
+
+Shared Error/Loading/Notice/Pagination/StateBadge behavior now provides alert/status/busy semantics, named pagination controls, readable non-color-only state, semantic Home/Search/Admin tables, improved dialog focus restoration, and responsive app/Admin/Request Detail layouts. A read-only `/admin/audit` page uses the shared tenant-aware client, exact supported filters/pagination, tenant-user actor labels, safe entity-area links, and escaped expandable payloads under `admin.audit.read`.
+
+Day 9 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test`, and `git diff --check` pass. Playwright 1.62.1 runs four Chromium tests covering Admin login/navigation, Users, Workflows, Reports, Settings, Audit, unauthorized Admin access, friendly 404, and 320px overflow including Request Detail. The exact pnpm commands were attempted but the desktop wrapper aborted before scripts with its known no-TTY dependency-purge guard. CI now installs Chromium and runs the same browser smoke with pnpm. Real ACME full-stack verification remains pending API polish/SQL deployment and is documented in `docs/sprint-3-web-verification.md` and `docs/sprint-3-known-issues.md`.

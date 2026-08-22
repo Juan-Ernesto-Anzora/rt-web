@@ -1,7 +1,9 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AxiosError } from "axios";
 import { HomePage } from "./HomePage";
+import { PaginationControls } from "../components/common/PaginationControls";
+import { StatusBadge } from "../components/requests/StatusBadge";
 import { useAdminPermission } from "../auth/adminPermissions";
 import { useAuth } from "../auth/useAuth";
 import { getCurrentUserProfile } from "../auth/userProfile";
@@ -45,9 +47,10 @@ function UserMenu({ onLogout, onProfile }: { onLogout(): void; onProfile(): void
   ];
 
   return (
-    <div className="absolute right-6 top-16 z-20 w-64 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+    <div role="menu" className="absolute right-0 top-11 z-20 w-64 max-w-[calc(100vw-1rem)] rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
       <button
         type="button"
+        role="menuitem"
         onClick={onProfile}
         className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
       >
@@ -57,6 +60,7 @@ function UserMenu({ onLogout, onProfile }: { onLogout(): void; onProfile(): void
         <button
           key={label}
           type="button"
+          role="menuitem"
           className="block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-neutral-700 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
         >
           {label}
@@ -64,6 +68,7 @@ function UserMenu({ onLogout, onProfile }: { onLogout(): void; onProfile(): void
       ))}
       <button
         type="button"
+        role="menuitem"
         onClick={onLogout}
         className="mt-1 block w-full cursor-pointer rounded-lg px-3 py-2 text-left text-sm font-medium text-danger-500 hover:bg-neutral-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
       >
@@ -87,15 +92,25 @@ function TopBar({
   onProfile(): void;
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const onPointerDown = (event: MouseEvent) => { if (!menuRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); document.removeEventListener("mousedown", onPointerDown); };
+  }, [open]);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-neutral-200 bg-white px-6">
+    <header className="flex min-h-16 flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white px-3 py-2 sm:px-6">
       <div className="text-lg font-semibold text-neutral-800">Request Tracker</div>
-      <div className="relative flex items-center gap-3">
-        <button type="button" className="btn btn-primary" onClick={onNew}>
+      <div ref={menuRef} className="relative flex min-w-0 items-center gap-2 sm:gap-3">
+        <button type="button" className="btn btn-primary hidden sm:inline-flex" onClick={onNew}>
           New Request
         </button>
-        <div className="rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-700">
+        <div className="hidden max-w-40 truncate rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-700 sm:block">
           Tenant: {tenant ?? "-"}
         </div>
         <button
@@ -104,9 +119,10 @@ function TopBar({
           onClick={() => setOpen((value) => !value)}
           aria-haspopup="menu"
           aria-expanded={open}
+          aria-label={`Open user menu for ${userName || "User"}`}
         >
           <div className="h-8 w-8 rounded-full bg-primary-600" />
-          <span className="text-sm font-medium text-neutral-800">{userName || "User"}</span>
+          <span className="hidden max-w-32 truncate text-sm font-medium text-neutral-800 sm:inline">{userName || "User"}</span>
         </button>
         {open && <UserMenu onLogout={onLogout} onProfile={onProfile} />}
       </div>
@@ -128,7 +144,8 @@ function SideNav({
   onNewRequest(): void;
 }) {
   return (
-    <aside className="w-60 border-r border-neutral-200 bg-neutral-50 p-3">
+    <aside className="w-full border-b border-neutral-200 bg-neutral-50 p-2 md:w-60 md:border-b-0 md:border-r md:p-3">
+      <nav aria-label="Primary navigation" className="flex gap-1 overflow-x-auto md:block">
       {NAV_ITEMS.filter((item) => showAdmin || item.id !== "admin").map((item) => {
         const targetView: AppView | null = item.id === "search" ? "search" : item.id === "home" ? "home" : null;
         const isActive = targetView === activeView;
@@ -142,14 +159,14 @@ function SideNav({
               if (item.id === "admin") onAdmin();
               if (targetView) onNavigate(targetView);
             }}
-            className={`mb-1 w-full px-4 py-2 text-left text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 ${
+            className={`min-w-max px-4 py-2 text-left text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 md:mb-1 md:w-full ${
               isActive ? "rounded-lg bg-primary-600 font-semibold text-white" : "rounded-lg hover:bg-neutral-100"
             }`}
           >
             {item.label}
           </button>
         );
-      })}
+      })}</nav>
     </aside>
   );
 }
@@ -162,13 +179,6 @@ function formatDate(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function statusClass(status: string, category?: string) {
-  const normalized = (category ?? status).toLowerCase();
-  if (normalized.includes("waiting")) return "bg-warning-500/15 text-neutral-900";
-  if (normalized.includes("closed")) return "bg-neutral-200 text-neutral-700";
-  return "bg-primary-50 text-primary-700";
 }
 
 function uniqueFacetValues(results: RequestSearchResult[], key: SearchFacetKey) {
@@ -224,29 +234,10 @@ function SearchResultsTable({
   onOpenRequest(requestId: string): void;
 }) {
   return (
-    <div className="card overflow-hidden">
-      <div className="grid grid-cols-[130px_1fr_112px_132px_132px_130px_116px] border-b border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-semibold text-neutral-600">
-        <div>ID</div>
-        <div>Request</div>
-        <div>Status</div>
-        <div>Assignee</div>
-        <div>Requester</div>
-        <div>Flow</div>
-        <div>Updated</div>
-      </div>
-      <div>
+    <div role="region" aria-label="Search results" tabIndex={0} className="overflow-x-auto rounded-lg border border-neutral-200 bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600">
+      <table className="w-full min-w-[900px] text-left text-sm"><caption className="sr-only">Request search results</caption><thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600"><tr><th scope="col" className="px-4 py-3">ID</th><th scope="col" className="px-4 py-3">Request</th><th scope="col" className="px-4 py-3">Status</th><th scope="col" className="px-4 py-3">Assignee</th><th scope="col" className="px-4 py-3">Requester</th><th scope="col" className="px-4 py-3">Flow</th><th scope="col" className="px-4 py-3">Updated</th><th scope="col" className="px-4 py-3"><span className="sr-only">Actions</span></th></tr></thead><tbody className="divide-y divide-neutral-100">
         {results.map((result) => (
-          <button
-            key={result.id}
-            type="button"
-            onClick={() => {
-              if (result.requestId) onOpenRequest(result.requestId);
-            }}
-            disabled={!result.requestId}
-            className="grid min-h-12 grid-cols-[130px_1fr_112px_132px_132px_130px_116px] items-center border-b border-neutral-100 px-4 py-2 text-left text-sm last:border-b-0 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <div className="font-semibold text-neutral-800">{result.id}</div>
-            <div className="min-w-0 pr-4">
+          <tr key={result.id} className="min-h-12 hover:bg-primary-50"><td className="px-4 font-semibold text-neutral-800">{result.id}</td><td className="max-w-80 px-4 py-2"><div className="min-w-0">
               <div className="truncate font-semibold text-neutral-900">{result.title}</div>
               <div className="mt-1 truncate text-xs text-neutral-600">{result.snippet}</div>
               {result.tags.length > 0 && (
@@ -258,19 +249,9 @@ function SearchResultsTable({
                   ))}
                 </div>
               )}
-            </div>
-            <div>
-              <span className={`rounded px-2 py-1 text-xs font-semibold ${statusClass(result.status, result.statusCategory)}`}>
-                {result.status}
-              </span>
-            </div>
-            <div className="truncate pr-4 text-neutral-700">{result.assignee}</div>
-            <div className="truncate pr-4 text-neutral-700">{result.requester}</div>
-            <div className="truncate pr-4 text-neutral-700">{result.flow}</div>
-            <div className="text-neutral-700">{result.updatedAt ? formatDate(result.updatedAt) : "-"}</div>
-          </button>
+            </div></td><td className="px-4"><StatusBadge status={result.status} category={result.statusCategory} /></td><td className="max-w-40 truncate px-4 text-neutral-700">{result.assignee}</td><td className="max-w-40 truncate px-4 text-neutral-700">{result.requester}</td><td className="max-w-40 truncate px-4 text-neutral-700">{result.flow}</td><td className="px-4 text-neutral-700">{result.updatedAt ? formatDate(result.updatedAt) : "-"}</td><td className="px-4 text-right"><button type="button" onClick={() => result.requestId && onOpenRequest(result.requestId)} disabled={!result.requestId} aria-label={`Open request ${result.id}`} className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 disabled:opacity-50">Open</button></td></tr>
         ))}
-      </div>
+      </tbody></table>
     </div>
   );
 }
@@ -293,7 +274,6 @@ function SearchView() {
   const assigneeValues = uniqueFacetValues(results, "assignee");
   const flowValues = uniqueFacetValues(results, "flow");
   const tagValues = uniqueFacetValues(results, "tag");
-  const totalPages = Math.max(1, Math.ceil(count / filters.pageSize));
 
   useEffect(() => {
     let cancelled = false;
@@ -372,7 +352,7 @@ function SearchView() {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Search Requests</h1>
           <p className="mt-1 text-sm text-neutral-600">Search open and closed requests from one place.</p>
@@ -384,7 +364,7 @@ function SearchView() {
         <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="search-query">
           Keyword
         </label>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <input
             id="search-query"
             value={filters.query}
@@ -405,7 +385,7 @@ function SearchView() {
         </div>
       </form>
 
-      <div className="grid grid-cols-[280px_minmax(0,1fr)] gap-4">
+      <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside className="card space-y-4 p-4">
           <div>
             <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="updated-from">
@@ -453,7 +433,7 @@ function SearchView() {
         <div className="space-y-3">
           {loading && <div className="text-sm text-neutral-500">Searching requests...</div>}
           {error && !loading && (
-            <div className="rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm text-danger-500">
+            <div role="alert" className="rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm text-danger-500">
               {error}
             </div>
           )}
@@ -470,29 +450,7 @@ function SearchView() {
               onOpenRequest={(requestId) => navigate(`/requests/${encodeURIComponent(requestId)}`)}
             />
           )}
-          <div className="flex items-center justify-between text-sm text-neutral-600">
-            <div>
-              Page {filters.page} of {totalPages}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => goToPage(Math.max(1, filters.page - 1))}
-                disabled={filters.page <= 1}
-                className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 hover:bg-white disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => goToPage(Math.min(totalPages, filters.page + 1))}
-                disabled={filters.page >= totalPages}
-                className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 hover:bg-white disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <PaginationControls page={filters.page} pageSize={filters.pageSize} count={count} label="results" onPageChange={goToPage} />
         </div>
       </div>
     </section>
@@ -515,7 +473,7 @@ export default function App({ initialView = "home" }: { initialView?: AppView })
         onLogout={logout}
         onProfile={() => navigate("/profile/preferences")}
       />
-      <div className="flex flex-1">
+      <div className="flex flex-1 flex-col md:flex-row">
         <SideNav
           activeView={activeView}
           showAdmin={canOpenAdmin}
@@ -523,7 +481,7 @@ export default function App({ initialView = "home" }: { initialView?: AppView })
           onAdmin={() => navigate("/admin")}
           onNewRequest={() => navigate("/requests/new")}
         />
-        <main className="flex-1 space-y-4 p-6">{activeView === "search" ? <SearchView /> : <HomePage />}</main>
+        <main className="min-w-0 flex-1 space-y-4 p-4 sm:p-6">{activeView === "search" ? <SearchView /> : <HomePage />}</main>
       </div>
     </div>
   );

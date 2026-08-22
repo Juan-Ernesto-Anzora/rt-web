@@ -179,7 +179,7 @@ function normalizeDetail(detail: RequestDetailDto): RequestDetail {
     dueAt: detail.due_at,
     createdAt: detail.created_at ?? "",
     updatedAt: detail.updated_at ?? "",
-    attachments: (detail.attachments ?? []).map(normalizeAttachment),
+    attachments: (detail.attachments ?? []).map(normalizeAttachment).filter((item) => item.id),
   };
 }
 
@@ -201,10 +201,10 @@ function normalizeTransition(transition: TransitionDto): RequestTransition {
 
 function normalizeActivity(activity: ActivityDto): RequestActivityEvent {
   return {
-    id: activity.id ?? activity.activityid ?? crypto.randomUUID(),
+    id: activity.id ?? activity.activityid ?? "",
     actorName: activity.actor_name ?? activity.actor?.name ?? "System",
     verb: activity.verb ?? activity.action ?? "updated request",
-    createdAt: activity.created_at ?? new Date().toISOString(),
+    createdAt: activity.created_at ?? "",
     payload: activity.payload ? JSON.stringify(activity.payload) : undefined,
   };
 }
@@ -254,7 +254,7 @@ export async function getRequestActivity(requestId: string): Promise<RequestActi
     { params: { page_size: 25, sort: "-created_at" } },
   );
   const results = Array.isArray(response.data) ? response.data : response.data.results ?? [];
-  return results.map(normalizeActivity);
+  return results.map(normalizeActivity).filter((activity) => activity.id && activity.createdAt);
 }
 
 export async function getRequestDetailBundle(requestId: string): Promise<RequestDetailBundle> {

@@ -4,13 +4,14 @@ import { useAdminPermission } from "../../auth/adminPermissions";
 import { useAuth } from "../../auth/useAuth";
 import { EmptyState } from "../../components/common/EmptyState";
 import AdminRolesPage from "./AdminRolesPage";
+import AdminAuditPage from "./AdminAuditPage";
 import AdminReportsPage from "./AdminReportsPage";
 import AdminSettingsPage from "./AdminSettingsPage";
 import AdminSlaPage from "./AdminSlaPage";
 import AdminUsersPage from "./AdminUsersPage";
 import WorkflowAdminPage from "./WorkflowAdminPage";
 
-type AdminSectionKey = "overview" | "workflows" | "users" | "roles" | "reports" | "sla" | "settings";
+type AdminSectionKey = "overview" | "workflows" | "users" | "roles" | "reports" | "sla" | "settings" | "audit";
 
 const ADMIN_SECTIONS: Array<{
   key: AdminSectionKey;
@@ -73,6 +74,14 @@ const ADMIN_SECTIONS: Array<{
     body: "Manage tenant defaults, feature flags, and notification templates.",
     anyPermissions: ["admin.settings", "featureflags.manage", "notifications.manage"],
   },
+  {
+    key: "audit",
+    label: "Audit",
+    path: "/admin/audit",
+    title: "Tenant audit",
+    body: "Review tenant administration and request activity history.",
+    permission: "admin.audit.read",
+  },
 ];
 
 function sectionFromPath(pathname: string) {
@@ -100,7 +109,7 @@ export default function AdminShellPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white px-6 py-4">
+      <header className="border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -114,7 +123,7 @@ export default function AdminShellPage() {
 
       <main className="grid gap-4 p-4 md:p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
         <aside className="card h-fit p-3">
-          <nav aria-label="Admin navigation" className="grid grid-cols-2 gap-1 sm:grid-cols-4 lg:block lg:space-y-1">
+          <nav aria-label="Admin navigation" className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1">
             {visibleSections.map((section) => {
               const isActive = section.key === activeSection.key;
               return (
@@ -146,6 +155,8 @@ export default function AdminShellPage() {
             <AdminSlaPage />
           ) : activeSection.key === "settings" ? (
             <AdminSettingsPage />
+          ) : activeSection.key === "audit" ? (
+            <AdminAuditPage />
           ) : (
             <div className="card p-5">
               <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
