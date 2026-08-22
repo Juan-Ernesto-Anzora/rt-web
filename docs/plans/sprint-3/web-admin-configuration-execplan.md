@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA configuration screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds a real-data reports experience, filtered CSV export, and SLA policy administration after their API contracts are documented and implemented.
+Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA/settings screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds a real-data reports experience, filtered CSV export, and SLA policy administration. Day 8 adds tenant general settings, feature flags, and safe plain-text notification-template administration against the implemented API contract.
 
 ## Repository orientation
 
@@ -16,17 +16,18 @@ This plan applies to `rt-web`. Relevant files and expected Sprint 3 edit targets
 - `src/api/requestDetail.ts`: existing tenant-user lookup normalization for array or paginated `results` responses; Admin directory calls must use dedicated `/api/admin/*` endpoints instead of the request-assignment lookup.
 - `src/api/adminWorkflows.ts`: established admin API client and error-normalization pattern to follow for the new directory client.
 - `src/api/adminDirectory.ts`: established typed admin pagination, normalization, permission-aware error, and mutation patterns to reuse for SLA administration.
+- `src/api/adminReports.ts` and `src/api/adminSla.ts`: established Day 7 typed-client, permission, and API-error patterns; Day 8 settings calls should follow these patterns without mixing configuration values into logs.
 - `src/api/dashboard.ts`: existing unfiltered dashboard summary client; it is not sufficient as a filtered reports contract.
 - `src/features/requestSearch.ts`: existing search parameter and request-result normalization; its current API contract does not cover the complete report filter set or aggregate breakdowns.
-- `src/auth/adminPermissions.ts`: tenant-scoped permission context loaded from `GET /api/admin/me/permissions/`; Day 5-6 must use its permission list for `admin.users`, `admin.roles`, and `admin.permissions` controls.
-- `src/pages/admin/AdminShellPage.tsx`: existing route-aware Admin shell; Day 7 will add permission-aware Reports and SLA navigation after contracts are confirmed.
+- `src/auth/adminPermissions.ts`: tenant-scoped permission context loaded from `GET /api/admin/me/permissions/`; Day 8 must use exact `admin.settings`, `tenant.settings.manage`, `featureflags.manage`, and `notifications.manage` codes.
+- `src/pages/admin/AdminShellPage.tsx`: existing route-aware Admin shell; Day 8 will add a permission-aware Settings destination and subsections.
 - `src/pages/admin/WorkflowAdminPage.tsx`: existing compact Admin loading, empty, save, and error-state patterns.
 - `design/design-tokens.json`, `tailwind.config.ts`, and `src/index.css`: design token mappings and shared compact UI classes.
 - `src/pages/`: new admin shell, admin landing, and forbidden page files should live here unless a more specific `src/pages/admin/` folder is introduced.
 - `src/components/common/`: existing `EmptyState`, `ErrorState`, and `LoadingRows` components for consistent loading/error UI.
 - `docs/plans/sprint-3/web-admin-configuration-execplan.md`: active ExecPlan for this sprint.
 
-Current routes in `src/main.tsx` include `/login`, `/search`, `/requests/new`, `/requests/:id`, `/profile/preferences`, `/403`, `/admin/*`, and `/`. `AdminShellPage` resolves `/admin`, `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/reports`, and `/admin/sla` inside the protected admin route.
+Current routes in `src/main.tsx` include `/login`, `/search`, `/requests/new`, `/requests/:id`, `/profile/preferences`, `/403`, `/admin/*`, and `/`. `AdminShellPage` resolves `/admin`, `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/reports`, and `/admin/sla` inside the protected admin route. Day 8 will add `/admin/settings` within the same protected shell.
 
 ## Current behavior
 
@@ -48,6 +49,13 @@ The adjacent API `feat/api-sla-reports` worktree now provides the Day 7 contract
 - `GET /api/reports/requests/export/?format=csv` with `reports.export`, the same report filters, UTF-8 CSV, and a server `Content-Disposition` filename.
 - `GET/POST /api/admin/sla-policies/` and `GET/PATCH /api/admin/sla-policies/{sla_policy_id}/` with `sla.manage`, paginated list behavior, lowercase priorities, integer targets, and `is_active` deactivation.
 - `GET /api/flows/`, flow-status lookup, and `GET /api/users/` provide readable report filter labels while requests submit only non-empty public IDs.
+
+The adjacent API worktree `codex/feat-api-admin-settings` implements the Day 8 contract in DRF routes, serializers, services, tests, and an additive SQL upgrade. The API changes are currently uncommitted and the SQL upgrade has not been applied to the live development database, so Web implementation must first verify that the API branch is committed/available and the database has `TenantSetting`, `FeatureFlag`, and `NotificationTemplate` rows. Confirmed operations are:
+
+- `GET /api/admin/settings/` requires baseline `admin.read` plus `admin.settings`; `PATCH /api/admin/settings/` additionally requires `tenant.settings.manage` and accepts one atomic `{ settings: [...] }` batch.
+- `GET /api/admin/feature-flags/` and `PATCH /api/admin/feature-flags/{key}/` require `featureflags.manage`. Keys are immutable and case-sensitive: `adminConsole`, `slaEnabled`, `exportsEnabled`, and `notificationTemplates`.
+- `GET /api/admin/notification-templates/`, `GET /api/admin/notification-templates/{template_id}/`, and `PATCH` of the detail route require `notifications.manage`. Event types are immutable and limited to `request.created`, `request.assigned`, `comment.added`, and `request.closed`.
+- Every operation also uses JWT, `X-Tenant`, active-tenant membership, and backend authorization. Cross-tenant or unknown flag/template identities return `404`; missing permissions return `403`.
 
 ## Desired behavior
 
@@ -78,6 +86,12 @@ The completed Day 1-4 foundation and planned Day 5-6 directory UI should provide
 - `reports.read`, `reports.export`, and `sla.manage` independently control navigation and actions. Hidden/disabled controls do not replace backend enforcement, and late `403` responses remain visible.
 - Reports and SLA screens use accessible tables/forms, pagination where the API returns collections, responsive layouts, loading/empty/error states, and no local/demo fallback.
 - No chart dependency is added. With the current stack, breakdowns use semantic tables plus token-colored CSS bars only when server totals are available; adding a library requires a separate documented justification.
+- Admin -> Settings exposes General, Feature flags, and Notification templates without combining their independent permissions. The Settings navigation entry is visible when the operator has at least one Day 8 read/manage permission; each subsection independently loads or explains why it is unavailable.
+- General settings display only `web_base_url`, `default_timezone`, `default_page_size`, and `email_from`, preserve the API `value_type`, and map backend validation to readable fields. Sensitive rows are never rendered as values: `is_sensitive=true` plus `has_value` may show only a neutral Configured/Not configured state.
+- Feature flags display exact key, API description, and current enabled state. Disabling any currently enabled flag requires confirmation because the API exposes no usage-status field; the UI describes the relevant area but never claims actual live usage. Day 8 flags are configuration only and do not yet gate existing endpoints.
+- Notification template editing uses exact API fields, a fixed allowed-placeholder reference, and plain-text preview with local sample values. Preview code never evaluates expressions or renders HTML, and backend validation remains authoritative.
+- Settings editors maintain a last-fetched snapshot. Save submits only normalized changed fields, Cancel restores the selected editor, Reset restores all fields in the current subsection to the last fetched server snapshot, and navigation/reload with unsaved changes requires confirmation. Reset does not mean factory defaults because no reset/default endpoint exists.
+- Every Day 8 screen has explicit loading, empty, retryable error, success, dirty, saving, and late-`403` states. Values and full template content are never written to console, telemetry, URLs, audit-facing client messages, or thrown error strings.
 
 ## Scope
 
@@ -130,6 +144,23 @@ Out of scope for Day 7:
 - Inventing API paths, filter parameter names, CSV media types, SLA JSON shapes, or deactivation semantics before generated OpenAPI defines them.
 - Adding a chart library to the current React/Vite dependency set.
 - SLA timer execution, breach notifications, business calendars, holidays, pause conditions, or historical reporting unless the API contract explicitly includes them.
+
+In scope for Day 8 planning and subsequent implementation:
+
+- `/admin/settings` with permission-aware General, Feature flags, and Notification templates sections.
+- Typed general setting controls and atomic save for the four approved keys.
+- Exact feature-flag catalogue display and confirmed enabled-to-disabled PATCH actions.
+- Four notification-template editors, allowed-placeholder reference, safe sample preview, active toggle, and server-validation feedback.
+- Snapshot-based save/cancel/reset, unsaved-change protection, accessible responsive forms, and positive/negative automated and manual tests.
+
+Out of scope for Day 8:
+
+- Creating, deleting, or renaming setting keys, feature flags, or notification event types.
+- Showing or attempting to recover sensitive setting values; editing unknown/sensitive settings is not part of the four-key General form.
+- Claiming feature usage, enforcing flags in the web/API, or hiding existing Reports/SLA/Admin routes based on Day 8 flag values. The API explicitly treats the flags as configuration-only in this milestone.
+- Suppressing built-in notification events. An inactive template or disabled `notificationTemplates` flag disables only the custom database override; the API falls back to built-in notification text.
+- HTML/WYSIWYG template editing, raw HTML preview, executable expressions, remote preview calls, test-email sending, or adding new placeholders.
+- Factory-default reset, settings history, secret rotation, SMTP credentials, API changes, or applying the API SQL upgrade from the Web repository.
 
 ## Implementation plan
 
@@ -290,7 +321,66 @@ SLA implementation steps after the contract gate passes:
 7. Treat deactivate as a state mutation, not deletion. Require confirmation, keep inactive policies visible through the confirmed active filter, avoid optimistic removal, and refetch the affected list/detail after success.
 8. Show loading skeletons, no-policy/no-filter-match states, success/error notifications, pagination, responsive table behavior, and readable backend validation. Never render raw `AppliesTo`, `Targets`, objects, or IDs.
 
-### Milestone 6: UX hardening and tests
+### Milestone 6: Admin Settings
+
+User-visible outcome: an authorized tenant administrator can open `/admin/settings`, edit the four approved general settings, review and toggle the four configured feature flags, and safely edit/preview the four notification templates. Permissions remain independent, sensitive values remain undisclosed, and unsaved edits cannot be lost silently.
+
+Contract and deployment gate before implementation:
+
+1. Verify that the API Day 8 branch has been committed and its generated `/api/schema` contains the five route shapes. The inspected `codex/feat-api-admin-settings` worktree is currently uncommitted, so the Web must not be merged ahead of an available API contract.
+2. Confirm infrastructure has applied `db/upgrade-sprint3-admin-settings.sql` to the development SQL Server. Until then, the endpoints may fail because the unmanaged models do not create their own tables.
+3. Reconfirm `GET /api/admin/me/permissions/` returns the exact Day 8 codes assigned for the active tenant. Do not infer access from role names or feature-flag values.
+4. Keep every call in the shared `src/lib/api.ts` client so `Authorization` and `X-Tenant` remain automatic. Do not put setting values or template content in URL parameters.
+
+Typed API client:
+
+1. Add `src/api/adminSettings.ts` with explicit DTOs and normalized UI models for `TenantSetting`, `FeatureFlag`, and `NotificationTemplate`. IDs remain internal keys; primary labels are setting labels, flag descriptions, and event labels.
+2. Implement only the confirmed relative paths: `/admin/settings/`, `/admin/feature-flags/`, `/admin/feature-flags/{key}/`, `/admin/notification-templates/`, and `/admin/notification-templates/{template_id}/`.
+3. Preserve exact public response fields. Settings use `setting_id`, `key`, `value`, `value_type`, `is_sensitive`, `has_value`, `updated_at`, and `updated_by_id`; flags use `feature_flag_id`, `key`, `enabled`, `description`, `updated_at`, and `updated_by_id`; templates use `notification_template_id`, `event_type`, `subject_template`, `body_template`, `is_active`, `updated_at`, and `updated_by_id`.
+4. Normalize standard `{code,message,details[]}` errors. Map nested settings validation such as `settings.0.value` back to the matching key when possible. Never stringify a response object, request payload, masked value, or template body into the visible error or console.
+5. Export the exact placeholder catalogue as immutable UI metadata: `human_id`, `title`, `request_id`, `request_url`, `requester_name`, `assignee_name`, `comment_author`, and `status_name`. This reference is display/preview metadata, not a replacement for backend validation.
+
+Admin route and permissions:
+
+1. Add Settings to `src/pages/admin/AdminShellPage.tsx` at `/admin/settings`. Show the navigation item when permission context contains any of `admin.settings`, `featureflags.manage`, or `notifications.manage`; `tenant.settings.manage` alone does not grant General read access.
+2. Add `src/pages/admin/AdminSettingsPage.tsx` with compact General, Feature flags, and Notification templates tabs or segmented navigation. Hide inaccessible tabs when at least one accessible tab exists; a direct inaccessible selection shows a clear forbidden subsection state and never calls its endpoint.
+3. General GET requires `admin.settings`; General Save additionally requires `tenant.settings.manage`. With read-only permission, render values and helpers but disable Save with an explanation.
+4. Feature flags require `featureflags.manage`; templates require `notifications.manage`. UI hiding remains advisory and every late API `403` stays visible without discarding local edits.
+
+General settings implementation:
+
+1. Load `GET /api/admin/settings/` and select only `web_base_url`, `default_timezone`, `default_page_size`, and `email_from` into a keyed form. If one is absent, show an explicit missing-configuration error rather than inventing a default. Unknown rows are not shown in the General editor.
+2. Preserve and submit each row's API `value_type`. Expected mappings are `web_base_url=url`, `default_timezone=timezone`, `default_page_size=integer`, and `email_from=email`; a mismatch disables Save and reports a contract/configuration error.
+3. Use typed controls and explanatory help: URL input for the request-link base; text input with IANA examples for timezone; numeric input with integer step and 1-100 bounds for page size; email input for notification sender. Explain that only `web_base_url` and `email_from` currently affect notification delivery, while timezone/page size are tenant client configuration and do not mutate Django global behavior.
+4. Normalize drafts before PATCH: trim text/email/timezone, remove a redundant trailing slash from `web_base_url`, and submit `default_page_size` as canonical base-10 text. Client validation mirrors obvious constraints, while backend validation remains authoritative for URL credentials/fragments/control characters, IANA timezone validity, and email validity.
+5. Save only changed non-sensitive approved rows in one atomic `{ settings: [{ key, value, value_type }] }` PATCH. On success, replace the snapshot from the returned `settings` collection and show success. On failure, keep edits and map field errors inline.
+6. For any `is_sensitive=true` row, ignore `value` even if unexpectedly present and display only Configured/Not configured from `has_value`. Do not place masked text in an input, DOM data attribute, title, log, or error. Sensitive rows are not writable through this four-key form.
+
+Feature-flag implementation:
+
+1. Load the bounded array from `GET /api/admin/feature-flags/`; render the exact case-sensitive key, API description, and Enabled/Disabled state for `adminConsole`, `slaEnabled`, `exportsEnabled`, and `notificationTemplates`. Missing keys get a visible configuration error; unknown keys may be shown read-only but are never renamed.
+2. Do not offer create, delete, or key/description editing in Day 8. Toggle writes submit only `{ enabled: boolean }` to the path key and refresh the list after success.
+3. Require a keyboard-accessible confirmation before every enabled-to-disabled PATCH. Use key-specific impact copy, while stating that Day 8 stores configuration and does not yet enforce existing Admin, SLA, export, or notification endpoints.
+4. The API has no `in_use` or usage-count field. Treat every currently enabled flag as potentially in use and confirm conservatively; never display an unverified "currently in use" claim. If a future API adds usage evidence, update the contract before changing this behavior.
+5. Do not optimistically flip the visible state. Show saving state on the selected flag, prevent duplicate clicks, retain the previous state on failure, and handle `404`/`403` clearly.
+
+Notification-template implementation:
+
+1. Load the bounded list from `GET /api/admin/notification-templates/` and present readable labels for `request.created`, `request.assigned`, `comment.added`, and `request.closed`. Select by `notification_template_id`; optionally refetch detail on selection so stale list content cannot overwrite newer edits.
+2. Provide subject editor, multiline body editor, and active checkbox. Event type and template ID are immutable. Enforce basic local constraints: nonblank subject/body, one-line subject, subject maximum 500 characters, and body maximum 20,000 characters; map backend placeholder/braces errors inline.
+3. Show the exact allowed-placeholder reference beside the editor with an insert-at-cursor action only if it can preserve selection and keyboard behavior. Unsupported placeholders, conversions, format specifiers, traversal, indexing, and malformed braces remain backend-rejected.
+4. Implement a deterministic local plain-text preview with fixed sample values. Replace only exact allowed `{name}` tokens, support literal `{{` and `}}`, and treat all other text as text. Render subject/body using normal React text nodes or `<pre>`; never use `dangerouslySetInnerHTML`, `innerHTML`, `eval`, `Function`, template compilation, Markdown HTML, or network calls.
+5. Suggested sample values are clearly labelled Preview data: `RT-2026-000123`, `VPN access request`, a fixed sample UUID, `https://rt.example.test/requests/<sample-id>`, `Ana Requester`, `Alex Agent`, `Maria User`, and `In Progress`. Preview data is never submitted.
+6. PATCH only changed `subject_template`, `body_template`, and/or `is_active`; refetch/replace the selected template after success. Explain that inactive custom templates and `notificationTemplates=false` fall back to built-in notification text rather than suppressing notification events.
+
+Save, reset, and unsaved changes:
+
+1. Keep server snapshots separate from drafts per subsection/template. Save updates the snapshot only from the API response. Cancel/Reset restores the current snapshot, not hardcoded seed values.
+2. Disable Save when clean, invalid, unauthorized, or already saving. Keep visible dirty state and an accessible status message after save/error.
+3. Use React Router's supported blocker API plus `beforeunload` for browser refresh/close. Confirm before leaving the Settings route, changing subsection, or selecting another template while the current draft is dirty. Continue/Discard restores or abandons the draft deterministically; Stay keeps focus in the editor.
+4. Loading, empty, and fatal error states must not render stale values as current. Retry refetches the relevant family only. A tenant change invalidates all settings snapshots and reloads under the new `X-Tenant`.
+
+### Milestone 7: UX hardening and tests
 
 Add focused Vitest/React Testing Library coverage when the repo test harness is present, plus browser/manual verification. Keep layout usable at mobile and desktop widths; verify focus trapping, Escape/cancel, initial focus, focus restoration, semantic labels, and no overlapping table/dialog content.
 
@@ -379,6 +469,35 @@ Manual Day 7 verification after API contract implementation:
 11. Verify duplicate/invalid SLA validation, missing `sla.manage`, late API `403`, empty lists, retryable failures, keyboard-only dialogs, and mobile/desktop layouts.
 12. Confirm no report/SLA screen renders raw objects, IDs, opaque SLA JSON, fabricated chart values, or local demo data.
 
+Automated Day 8 verification:
+
+- Add a focused Vitest/React Testing Library harness if it is still absent, with `pnpm test` or a documented equivalent script. Keep test setup scoped to Web behavior; do not duplicate API serializer tests.
+- Test settings DTO normalization, exact key/type matching, sensitive-value suppression even when a malformed fixture contains a value, changed-only atomic payload construction, URL trailing-slash normalization, canonical page-size text, and nested backend field-error mapping.
+- Test General read-only behavior with `admin.settings` but no `tenant.settings.manage`, write access with both permissions, hidden/inaccessible General behavior without `admin.settings`, and a simulated late `403` that preserves dirty input.
+- Test feature flag exact-case keys, descriptions/states, confirmation on every enabled-to-disabled action, no confirmation for disabled-to-enabled, one in-flight PATCH, failure state restoration, and the absence of unverified live-usage claims.
+- Test template list/detail normalization, immutable event identity, subject/body bounds, allowed-placeholder reference, escaped braces, plain-text sample replacement, and unsupported/malformed placeholder feedback while preserving backend authority.
+- Include an XSS regression fixture such as `<img src=x onerror=alert(1)>` in a subject/body and prove preview renders literal text with no `innerHTML`, `dangerouslySetInnerHTML`, script execution, or DOM element creation.
+- Test Save/Cancel/Reset snapshots, subsection/template selection blocking while dirty, browser unload registration/cleanup, successful snapshot replacement, retryable loading/empty/error states, and tenant-change invalidation.
+- Run `pnpm lint`, `pnpm build`, `pnpm test`, and `git diff --check`. If pnpm again aborts before scripts in the non-interactive shell, run the exact npm package-script equivalents and record the environment limitation separately from script results.
+
+Manual Day 8 verification:
+
+1. Confirm the API Day 8 branch/schema is available and the SQL upgrade has been applied. Sign in to ACME with all Day 8 permissions and open `/admin/settings`.
+2. In DevTools Network, confirm `GET /api/admin/settings/`, `GET /api/admin/feature-flags/`, and `GET /api/admin/notification-templates/` use `Authorization` and `X-Tenant: ACME`; confirm no setting/template value appears in a URL.
+3. General: verify the four approved controls and help text. Change all four, then confirm one `PATCH /api/admin/settings/` sends an atomic `settings` array with exact keys/value types and only changed rows. Confirm success refreshes the snapshot.
+4. Enter an invalid URL, unknown timezone, page size 0/101, and malformed email. Confirm local feedback is readable and backend `400 details[]` maps to the correct field without raw objects or values in logs.
+5. Exercise a sensitive-setting fixture/API response. Confirm the DOM shows only Configured/Not configured, never the raw or masked value, and no PATCH includes that row.
+6. Use a token with `admin.settings` but no `tenant.settings.manage`: GET remains readable, Save is disabled with an explanation, and a forced PATCH returns visible `403` without clearing edits. Use a token without `admin.settings` and confirm no General request is sent.
+7. Feature flags: confirm all four exact keys, descriptions, and states. Disable an enabled flag, verify the confirmation does not claim measured usage, then confirm `PATCH /api/admin/feature-flags/{exactKey}/` sends only `{ "enabled": false }` and refetches. Verify rejected `403/404` leaves the old state.
+8. Confirm the UI explains that Day 8 flags are configuration-only: changing `adminConsole`, `slaEnabled`, or `exportsEnabled` must not be presented as proof that current routes were disabled.
+9. Templates: open each supported event and verify readable label, subject, body, active state, and exact placeholder reference. Confirm selection uses the public template ID internally but never displays it as the primary label.
+10. Preview a subject/body containing every allowed placeholder, escaped braces, line breaks, and HTML-looking text. Confirm fixed sample values render as plain text and no HTML executes.
+11. Save a valid template and confirm `PATCH /api/admin/notification-templates/{template_id}/` contains only changed `subject_template`, `body_template`, and/or `is_active`; confirm returned data replaces the snapshot.
+12. Trigger unknown placeholder, traversal, malformed braces, multiline subject, blank fields, and length errors. Confirm backend messages appear at the subject/body control and unsaved input remains.
+13. Disable one custom template and `notificationTemplates`; confirm the UI states that built-in notifications still send. Trigger the corresponding event and verify the API/MailHog fallback separately if the backend environment is available.
+14. Make edits, then Cancel/Reset, switch template/tab, navigate Home, refresh, and close the browser tab. Confirm dirty-state prompts appear only when needed and discarded edits never leak into another tenant/template.
+15. Repeat at mobile and desktop widths with keyboard only. Verify tab order, focus-visible controls, accessible confirmation/dialog names, Escape/cancel behavior, no overlaps, and clear loading/empty/error/success states.
+
 ## Acceptance criteria
 
 - `/admin` is registered and protected by authentication.
@@ -417,6 +536,15 @@ Manual Day 7 verification after API contract implementation:
 - SLA administration requires `sla.manage`, uses paginated real API policies, sends lowercase priorities and integer minutes, shows readable duration hints, and supports API-defined create/edit/deactivate behavior.
 - Report/export/SLA calls preserve Authorization and `X-Tenant`, handle late `403`, and never use local/demo fallback or raw object/ID labels.
 - Day 7 includes focused automated and manual verification for permissions, tenancy headers, filters, downloads, pagination, validation, accessibility, and responsive layouts.
+- Day 8 implementation starts only after the API settings contract is committed/available and the additive SQL upgrade is applied to the test environment.
+- `/admin/settings` navigation and subsections are independently permission-aware for `admin.settings`, `tenant.settings.manage`, `featureflags.manage`, and `notifications.manage`; backend `403` remains authoritative.
+- General Settings displays and edits only `web_base_url`, `default_timezone`, `default_page_size`, and `email_from` with exact API types, typed help, changed-only atomic PATCH, inline backend errors, and refreshed snapshots.
+- Sensitive setting values are never displayed, logged, put in URLs, copied into form state, or submitted from a masked response; only `has_value` may produce a neutral presence label.
+- Feature flags display exact case-sensitive keys, descriptions, and current state. Every enabled-to-disabled action is confirmed, but the UI never invents API usage evidence or claims Day 8 flags already enforce routes.
+- Notification templates support the four exact event types, subject/body/active editing, the exact allowed-placeholder reference, and local fixed-sample preview rendered strictly as plain text.
+- Template IDs/event types and setting/flag keys remain immutable. The Web exposes no create/delete/rename, HTML preview, executable syntax, factory reset, notification suppression, or demo fallback.
+- Save/Cancel/Reset and dirty-navigation protection work per setting family/template; successful writes replace snapshots from real API responses and failures preserve edits.
+- Day 8 calls preserve Authorization and `X-Tenant`, handle tenant changes and late `403/404`, and expose loading, empty, retryable error, saving, success, read-only, and responsive keyboard-accessible states.
 
 ## Progress
 
@@ -429,7 +557,11 @@ Manual Day 7 verification after API contract implementation:
 - [x] Day 7 Milestone 5 planned against the API contract and its initial gaps.
 - [x] Milestone 5 implemented against the confirmed report/export/SLA routes and public fields.
 - [x] Day 7 typecheck, ESLint, production build, and diff validation completed; no frontend test harness is configured in `package.json`.
-- [ ] Milestone 6 implemented.
+- [x] Day 8 Milestone 6 planned against the implemented API settings/flags/templates contract.
+- [x] Milestone 6 implemented in Web against the inspected Day 8 API contract.
+- [x] Day 8 TypeScript, ESLint, production build, and diff validation pass through the available npm package scripts.
+- [ ] Day 8 authenticated API/browser verification remains blocked until the API branch is committed/available and its SQL upgrade is applied to the development environment.
+- [ ] Milestone 7 implemented.
 
 ## Surprises & Discoveries
 
@@ -465,6 +597,15 @@ Manual Day 7 verification after API contract implementation:
 - 2026-08-17: The API worktree advanced to `feat/api-sla-reports` with concrete report summary/export and SLA serializers, views, routes, and tests. This removed the Day 7 contract blocker without requiring changes in the API repository.
 - 2026-08-17: Report date filters are DRF `DateTimeField` values, while the web controls are calendar dates. The shared filter serializer converts lower bounds to local-day start and upper bounds to local-day end, then sends ISO datetimes to both summary and export.
 - 2026-08-17: Export errors arrive as blobs because successful CSV requests use Axios `responseType: "blob"`; the client must parse JSON from an error blob before presenting API permission or validation text.
+- 2026-08-21: The adjacent API worktree `codex/feat-api-admin-settings` contains the complete Day 8 routes, serializers, services, tests, models, and additive SQL, but those changes are uncommitted and the upgrade script has not been applied to the live development database. Web implementation has a deployment/contract gate even though planning can use the code as the concrete schema.
+- 2026-08-21: Settings GET returns an object with a `settings` array, while feature flags and notification templates return bounded arrays without pagination. Settings PATCH is an atomic array; flags and templates PATCH one immutable path identity at a time.
+- 2026-08-21: Sensitive settings are not partially masked. The API returns `value=null`, `is_sensitive=true`, and `has_value`; therefore the Web must never use asterisks or a masked fragment as an editable value.
+- 2026-08-21: `default_timezone` and `default_page_size` are tenant configuration exposed to clients but do not currently alter Django process-global timezone or pagination. Help text must not promise runtime behavior the API does not implement.
+- 2026-08-21: Feature flag responses contain no usage or dependency indicator, and Day 8 does not gate existing endpoints on flag state. The requested disable-in-use safeguard must be conservative confirmation for every enabled flag, not a fabricated usage badge.
+- 2026-08-21: An inactive notification template or disabled `notificationTemplates` flag selects the backend built-in fallback; it does not suppress the event or email. The Web needs to communicate this distinction clearly.
+- 2026-08-21: The API template allowlist is exactly eight plain placeholders and rejects traversal, indexing, conversions, format specifiers, malformed braces, multiline subjects, and unknown fields. A local preview can be useful but must remain non-authoritative and plain text.
+- 2026-08-21: React Router 7 exposes `useBlocker` in the existing data-router setup, so Day 8 can protect SPA navigation without adding a routing dependency; `beforeunload` separately covers refresh/tab close.
+- 2026-08-21: The Web package still has no Vitest/React Testing Library dependencies or test script. Day 8 keeps parsing and normalization in explicit functions and runs typecheck/lint/build, while the focused test-harness work remains in Milestone 7.
 
 ## Decision Log
 
@@ -498,6 +639,14 @@ Manual Day 7 verification after API contract implementation:
 - 2026-08-17: Implement Day 7 only against `/reports/summary/`, `/reports/requests/export/`, and `/admin/sla-policies/` relative to the shared API base. Do not reuse dashboard/search or derive missing metrics client-side.
 - 2026-08-17: Keep report draft filters separate from applied filters. Summary and CSV both serialize the applied object, so an unsaved control edit cannot silently change an export.
 - 2026-08-17: Normalize SLA names with trimming, priorities to lowercase enum values, and targets to positive integer minutes. Map API `details[].field` values back to the corresponding form control.
+- 2026-08-21: Use one `/admin/settings` destination with independently permissioned subsections rather than separate top-level navigation items. Show it when at least one Day 8 family is accessible and never call an inaccessible family's endpoint.
+- 2026-08-21: Treat General Settings as read-only with `admin.settings` alone and writable only with both `admin.settings` and `tenant.settings.manage`. Specialized flag/template permissions do not imply General access.
+- 2026-08-21: Edit only the four approved non-sensitive general keys and submit changed rows in one atomic PATCH. Reset means restore the latest server snapshot, not factory defaults.
+- 2026-08-21: Preserve exact case-sensitive flag keys and immutable template event types. Feature disable uses confirmed, non-optimistic per-key PATCH because the API has no bulk or rollback operation.
+- 2026-08-21: Preview notification templates locally with fixed sample strings and exact-token substitution, rendered through React text nodes. Backend validation is the source of truth; the preview will never use HTML, expression evaluation, or remote rendering.
+- 2026-08-21: Never log configuration payloads or include values/template content in URL state. Dirty drafts live only in component state and are discarded on tenant change after confirmation.
+- 2026-08-21: Keep each Settings family in its own component and request/error boundary. A late `403` or missing-table failure in General, Flags, or Templates remains local and does not replace the Admin shell or the other sections.
+- 2026-08-21: Refresh each family from its GET endpoint after a successful PATCH rather than trusting local optimistic state or only the mutation response.
 
 ## Outcomes & Retrospective
 
@@ -518,3 +667,7 @@ Milestone 5 outcome: Admin -> Reports now loads only server-calculated summary f
 Admin -> SLA Policies now lists and filters paginated policies, creates and edits normalized policies, shows readable duration hints while submitting integer minutes, maps backend validation to fields, and deactivates through `PATCH {is_active: false}` with confirmation and refetch. Navigation and controls are permission-aware and no report or SLA demo fallback exists.
 
 Day 7 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` pass. The requested `pnpm lint` and `pnpm build` commands were attempted, but this non-interactive Windows runtime aborts during pnpm dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; neither script itself was reached. The equivalent package scripts pass through npm. No Vitest/React Testing Library dependencies or test script exist yet, so no component test command is available for this milestone.
+
+Day 8 outcome: `/admin/settings` now contains independently permissioned General Settings, Feature Flags, and Notification Templates sections backed by a typed shared-client module. General writes submit changed approved keys as one atomic batch; flags preserve exact case-sensitive keys and confirm enabled-to-disabled changes; template writes preserve immutable identity and preview exact allowed placeholders as plain text while leaving unknown placeholders unchanged and visibly invalid. Sensitive values never enter editable state, section-level `403` responses stay local, successful writes refetch server state, and dirty settings/templates block navigation. Authenticated API/browser verification remains pending until the API work and SQL upgrade are deployed.
+
+Day 8 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` pass. `pnpm lint` and `pnpm build` were attempted as requested, but this non-interactive Windows runtime aborted during pnpm dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` before either script ran. The generated `.pnpm-store` was removed. No automated test command exists in the current Web package; focused component coverage remains part of Milestone 7.

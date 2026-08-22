@@ -5,11 +5,12 @@ import { useAuth } from "../../auth/useAuth";
 import { EmptyState } from "../../components/common/EmptyState";
 import AdminRolesPage from "./AdminRolesPage";
 import AdminReportsPage from "./AdminReportsPage";
+import AdminSettingsPage from "./AdminSettingsPage";
 import AdminSlaPage from "./AdminSlaPage";
 import AdminUsersPage from "./AdminUsersPage";
 import WorkflowAdminPage from "./WorkflowAdminPage";
 
-type AdminSectionKey = "overview" | "workflows" | "users" | "roles" | "reports" | "sla";
+type AdminSectionKey = "overview" | "workflows" | "users" | "roles" | "reports" | "sla" | "settings";
 
 const ADMIN_SECTIONS: Array<{
   key: AdminSectionKey;
@@ -18,6 +19,7 @@ const ADMIN_SECTIONS: Array<{
   title: string;
   body: string;
   permission?: string;
+  anyPermissions?: string[];
 }> = [
   {
     key: "overview",
@@ -63,6 +65,14 @@ const ADMIN_SECTIONS: Array<{
     body: "Configure tenant response and resolution targets by priority.",
     permission: "sla.manage",
   },
+  {
+    key: "settings",
+    label: "Settings",
+    path: "/admin/settings",
+    title: "Tenant settings",
+    body: "Manage tenant defaults, feature flags, and notification templates.",
+    anyPermissions: ["admin.settings", "featureflags.manage", "notifications.manage"],
+  },
 ];
 
 function sectionFromPath(pathname: string) {
@@ -77,7 +87,12 @@ export default function AdminShellPage() {
   const { token, tenant } = useAuth();
   const { context } = useAdminPermission(token, tenant);
   const permissions = context?.permissions ?? [];
-  const visibleSections = ADMIN_SECTIONS.filter((section) => !section.permission || permissions.includes(section.permission));
+  const visibleSections = ADMIN_SECTIONS.filter(
+    (section) =>
+      (!section.permission && !section.anyPermissions) ||
+      (section.permission ? permissions.includes(section.permission) : false) ||
+      Boolean(section.anyPermissions?.some((permission) => permissions.includes(permission))),
+  );
 
   if (!activeSection) {
     return <Navigate to="/admin" replace />;
@@ -129,6 +144,8 @@ export default function AdminShellPage() {
             <AdminReportsPage />
           ) : activeSection.key === "sla" ? (
             <AdminSlaPage />
+          ) : activeSection.key === "settings" ? (
+            <AdminSettingsPage />
           ) : (
             <div className="card p-5">
               <h2 className="text-lg font-semibold text-neutral-900">{activeSection.title}</h2>
