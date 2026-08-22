@@ -50,16 +50,9 @@ const QUICK_FILTERS: Array<{ key: QuickFilter; label: string }> = [
   { key: "unassigned", label: "Unassigned" },
 ];
 
-const EMPTY_SUMMARY: DashboardSummary = {
-  open: 0,
-  inProgress: 0,
-  dueToday: 0,
-  overdue: 0,
-};
-
 export function HomePage() {
   const navigate = useNavigate();
-  const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DashboardListKey>("my_tasks");
@@ -77,6 +70,7 @@ export function HomePage() {
       setSummary(nextSummary);
       setSummaryError(null);
     } catch {
+      setSummary(null);
       setSummaryError("Could not load dashboard summary from API.");
     } finally {
       setSummaryLoading(false);
@@ -128,7 +122,7 @@ export function HomePage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Home</h1>
           <p className="mt-1 text-sm text-neutral-600">Track the request queues that need attention today.</p>
@@ -153,14 +147,14 @@ export function HomePage() {
 
       {summaryError && <ErrorState message={summaryError} onRetry={loadSummary} />}
 
-      <div className="grid grid-cols-4 gap-4">
-        <KpiCard label="Open" value={summary.open} loading={summaryLoading} />
-        <KpiCard label="In Progress" value={summary.inProgress} loading={summaryLoading} />
-        <KpiCard label="Due Today" value={summary.dueToday} loading={summaryLoading} />
-        <KpiCard label="Overdue" value={summary.overdue} loading={summaryLoading} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <KpiCard label="Open" value={summary?.open ?? null} loading={summaryLoading} />
+        <KpiCard label="In Progress" value={summary?.inProgress ?? null} loading={summaryLoading} />
+        <KpiCard label="Due Today" value={summary?.dueToday ?? null} loading={summaryLoading} />
+        <KpiCard label="Overdue" value={summary?.overdue ?? null} loading={summaryLoading} />
       </div>
 
-      <form onSubmit={submitSearch} className="card flex gap-3 p-3">
+      <form onSubmit={submitSearch} className="card flex flex-col gap-3 p-3 sm:flex-row">
         <label className="sr-only" htmlFor="home-search">
           Search requests
         </label>
@@ -185,7 +179,7 @@ export function HomePage() {
 
       <div className="card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex rounded-lg border border-neutral-300 bg-neutral-50 p-1">
+          <div className="flex max-w-full overflow-x-auto rounded-lg border border-neutral-300 bg-neutral-50 p-1">
             {TABS.map((tab) => (
               <button
                 key={tab.key}

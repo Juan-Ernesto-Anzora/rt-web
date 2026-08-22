@@ -1,0 +1,119 @@
+import { expect, test, type Page, type Route } from "@playwright/test";
+
+const ADMIN_PERMISSIONS = [
+  "admin.read", "admin.users", "admin.roles", "admin.permissions", "admin.workflows",
+  "admin.audit.read", "reports.read", "reports.export", "sla.manage", "admin.settings",
+  "tenant.settings.manage", "featureflags.manage", "notifications.manage",
+];
+
+function testJwt() {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "none", typ: "JWT" })}.${encode({ email: "admin@example.com", display_name: "Admin User", exp: 4_102_444_800 })}.test`;
+}
+
+function json(route: Route, body: unknown, status = 200) {
+  return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+}
+
+async function mockApi(page: Page, authorized = true) {
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^\/api/, "");
+    if (!["fetch", "xhr"].includes(request.resourceType())) return route.continue();
+    if (path === "/auth/jwt/create" && request.method() === "POST") return json(route, { access: testJwt(), refresh: "test-refresh" });
+    if (path === "/admin/me/permissions/") {
+      if (!authorized) return json(route, { code: "permission_denied", message: "Denied", details: [] }, 403);
+      return json(route, { tenant_id: "11111111-1111-4111-8111-111111111111", user: { user_id: "22222222-2222-4222-8222-222222222222", display_name: "Admin User", email: "admin@example.com" }, roles: ["RT Admin"], permissions: ADMIN_PERMISSIONS, is_admin: true, can_read_audit: true });
+    }
+    if (path === "/dashboard/summary/") return json(route, { open: 2, in_progress: 1, waiting: 0, closed: 3, due_today: 1, overdue: 0, assigned_to_me: 2, unassigned: 0 });
+    if (path === "/requests/" && request.method() === "GET") return json(route, { count: 0, next: null, previous: null, results: [] });
+    if (path === "/admin/users/") return json(route, { count: 1, next: null, previous: null, results: [{ user_id: "33333333-3333-4333-8333-333333333333", email: "agent@example.com", display_name: "Agent User", employee_code: "A-1", avatar_url: null, is_active: true, created_at: "2026-08-01T12:00:00Z", updated_at: null }] });
+    if (path === "/admin/roles/") return json(route, { count: 0, next: null, previous: null, results: [] });
+    if (path === "/admin/permissions/") return json(route, { count: 0, next: null, previous: null, results: [] });
+    if (path === "/admin/workflows/") return json(route, []);
+    if (path === "/flows/") return json(route, []);
+    if (path === "/users/") return json(route, []);
+    if (path === "/reports/summary/") return json(route, { total: 6, open: 2, in_progress: 1, waiting: 0, closed: 3, due_today: 1, overdue: 0, unassigned: 0, assigned_to_me: 2, by_priority: [{ priority: "normal", count: 6 }], by_status: [{ status_id: "44444444-4444-4444-8444-444444444444", name: "Open", category: "open", count: 2 }] });
+    if (path === "/admin/settings/") return json(route, { settings: [
+      { setting_id: "50000000-0000-4000-8000-000000000001", key: "web_base_url", value: "http://127.0.0.1:5173", value_type: "url", is_sensitive: false, has_value: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null },
+      { setting_id: "50000000-0000-4000-8000-000000000002", key: "default_timezone", value: "America/El_Salvador", value_type: "timezone", is_sensitive: false, has_value: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null },
+      { setting_id: "50000000-0000-4000-8000-000000000003", key: "default_page_size", value: "25", value_type: "integer", is_sensitive: false, has_value: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null },
+      { setting_id: "50000000-0000-4000-8000-000000000004", key: "email_from", value: "rt@example.com", value_type: "email", is_sensitive: false, has_value: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null },
+    ] });
+    if (path === "/admin/feature-flags/") return json(route, ["adminConsole", "slaEnabled", "exportsEnabled", "notificationTemplates"].map((key, index) => ({ feature_flag_id: `60000000-0000-4000-8000-00000000000${index + 1}`, key, enabled: true, description: `${key} setting`, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null })));
+    if (path === "/admin/notification-templates/") return json(route, ["request.created", "request.assigned", "comment.added", "request.closed"].map((event_type, index) => ({ notification_template_id: `70000000-0000-4000-8000-00000000000${index + 1}`, event_type, subject_template: "Request {human_id}", body_template: "Open {request_url}", is_active: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null })));
+    if (path.startsWith("/admin/notification-templates/") && request.method() === "GET") return json(route, { notification_template_id: path.split("/")[3], event_type: "request.created", subject_template: "Request {human_id}", body_template: "Open {request_url}", is_active: true, updated_at: "2026-08-01T12:00:00Z", updated_by_id: null });
+    if (path === "/admin/audit/") return json(route, { count: 1, next: null, previous: null, results: [{ activity_id: "80000000-0000-4000-8000-000000000001", request_id: null, actor_id: null, type: "admin.role.updated", payload: "{\"changed_fields\":[\"description\"]}", payload_json: { changed_fields: ["description"] }, entity_id: "90000000-0000-4000-8000-000000000001", entity_type: "role", created_at: "2026-08-01T12:00:00Z" }] });
+    if (/^\/requests\/[0-9a-f-]+\/$/.test(path)) return json(route, { request_id: path.split("/")[2], human_id: "RT-2026-000123", title: "Responsive request", description: "Request detail smoke data.", priority: "normal", flow: { flow_id: "a0000000-0000-4000-8000-000000000001", name: "IT Support", description: "" }, status: { status_id: "a0000000-0000-4000-8000-000000000002", name: "Open", category: "open", is_terminal: false }, requester: { user_id: "a0000000-0000-4000-8000-000000000003", email: "requester@example.com", display_name: "Requester User" }, assignee: null, due_at: null, created_at: "2026-08-01T12:00:00Z", updated_at: "2026-08-01T12:00:00Z", attachments: [] });
+    if (/^\/requests\/[0-9a-f-]+\/(comments|attachments|activity|available-transitions)\/$/.test(path)) return json(route, []);
+    return json(route, { code: "not_found", message: `Unhandled smoke API route: ${path}`, details: [] }, 404);
+  });
+}
+
+async function login(page: Page) {
+  await page.goto("/login");
+  await page.getByLabel("Tenant code").fill("ACME");
+  await page.getByLabel("Username").fill("admin@example.com");
+  await page.getByLabel("Password").fill("test-password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+}
+
+test("admin login and Sprint 3 navigation smoke", async ({ page }) => {
+  const pageErrors: Error[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+  await mockApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "Admin", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Users" }).click();
+  await expect(page.getByRole("heading", { name: "Users and memberships" })).toBeVisible();
+  await expect(page.getByText("Agent User")).toBeVisible();
+
+  await page.getByRole("button", { name: "Workflows" }).click();
+  await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Reports" }).click();
+  await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Priority breakdown" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "General settings" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Audit" }).click();
+  await expect(page.getByRole("heading", { name: "Audit" })).toBeVisible();
+  await expect(page.getByText("Admin · role · updated")).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("unauthorized admin route uses friendly 403", async ({ page }) => {
+  await mockApi(page, false);
+  await login(page);
+  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/403$/);
+  await expect(page.getByRole("heading", { name: "Access denied" })).toBeVisible();
+  await expect(page.getByText("Unexpected Application Error")).toHaveCount(0);
+});
+
+test("unknown route uses friendly 404", async ({ page }) => {
+  await page.goto("/not-a-real-page");
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  await expect(page.getByText("Unexpected Application Error")).toHaveCount(0);
+});
+
+test("Sprint 3 admin and request detail avoid page-level mobile overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await mockApi(page);
+  await login(page);
+  await page.getByRole("button", { name: "Admin", exact: true }).click();
+  for (const section of ["Users", "Roles & Permissions", "Workflows", "Reports", "Settings", "Audit"]) {
+    await page.getByRole("button", { name: section, exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
+  await page.goto("/requests/a0000000-0000-4000-8000-000000000010");
+  await expect(page.getByRole("heading", { name: "Responsive request" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

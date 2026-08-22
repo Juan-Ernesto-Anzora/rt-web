@@ -141,17 +141,19 @@ function normalizeList(data: RequestListDto | RequestDto[]): DashboardListRespon
   };
 }
 
-function numberValue(...values: Array<number | undefined>) {
-  return values.find((value) => typeof value === "number" && Number.isFinite(value)) ?? 0;
+function requiredNumber(field: string, ...values: Array<number | undefined>) {
+  const value = values.find((candidate) => typeof candidate === "number" && Number.isFinite(candidate));
+  if (value === undefined) throw new Error(`Dashboard summary is missing ${field}.`);
+  return value;
 }
 
 function normalizeSummary(data: DashboardSummaryDto): DashboardSummary {
   const source = data.kpis ?? data.counts ?? data;
   return {
-    open: numberValue(source.open, source.open_count),
-    inProgress: numberValue(source.inProgress, source.in_progress, source.in_progress_count),
-    dueToday: numberValue(source.dueToday, source.due_today, source.due_today_count),
-    overdue: numberValue(source.overdue, source.overdue_count),
+    open: requiredNumber("open", source.open, source.open_count),
+    inProgress: requiredNumber("in_progress", source.inProgress, source.in_progress, source.in_progress_count),
+    dueToday: requiredNumber("due_today", source.dueToday, source.due_today, source.due_today_count),
+    overdue: requiredNumber("overdue", source.overdue, source.overdue_count),
   };
 }
 

@@ -1,17 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { Navigate, RouterProvider, createBrowserRouter } from "react-router-dom";
+import { Navigate, Outlet, RouterProvider, createBrowserRouter } from "react-router-dom";
 import { useAdminPermission } from "./auth/adminPermissions";
 import { AuthProvider, useAuth } from "./auth/useAuth";
 import { ErrorState } from "./components/common/ErrorState";
+import { AppErrorBoundary } from "./components/common/AppErrorBoundary";
 import "./index.css";
 import App from "./pages/App";
 import AdminShellPage from "./pages/admin/AdminShellPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import Login from "./pages/Login";
+import NotFoundPage from "./pages/NotFoundPage";
 import ProfilePreferencesPage from "./pages/ProfilePreferencesPage";
 import RequestCreatePage from "./pages/RequestCreatePage";
 import RequestDetailPage from "./pages/RequestDetailPage";
+import RouteErrorPage from "./pages/RouteErrorPage";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -51,13 +54,14 @@ function AdminProtected({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const router = createBrowserRouter([
+const router = createBrowserRouter([{
+  path: "/",
+  element: <Outlet />,
+  errorElement: <RouteErrorPage />,
+  children: [
+  { path: "login", element: <Login /> },
   {
-    path: "/login",
-    element: <Login />,
-  },
-  {
-    path: "/search",
+    path: "search",
     element: (
       <Protected>
         <App initialView="search" />
@@ -65,7 +69,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/requests/new",
+    path: "requests/new",
     element: (
       <Protected>
         <RequestCreatePage />
@@ -73,7 +77,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/requests/:id",
+    path: "requests/:id",
     element: (
       <Protected>
         <RequestDetailPage />
@@ -81,7 +85,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/profile/preferences",
+    path: "profile/preferences",
     element: (
       <Protected>
         <ProfilePreferencesPage />
@@ -89,7 +93,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/403",
+    path: "403",
     element: (
       <Protected>
         <ForbiddenPage />
@@ -97,7 +101,7 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/admin/*",
+    path: "admin/*",
     element: (
       <AdminProtected>
         <AdminShellPage />
@@ -105,14 +109,16 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "/",
+    index: true,
     element: (
       <Protected>
         <App />
       </Protected>
     ),
   },
-]);
+  { path: "*", element: <NotFoundPage /> },
+  ],
+}]);
 
 function Root() {
   return <RouterProvider router={router} />;
@@ -121,7 +127,7 @@ function Root() {
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
-      <Root />
+      <AppErrorBoundary><Root /></AppErrorBoundary>
     </AuthProvider>
   </React.StrictMode>,
 );

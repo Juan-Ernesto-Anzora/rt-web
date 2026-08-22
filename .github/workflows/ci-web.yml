@@ -8,6 +8,8 @@ on:
       - "tsconfig*.json"
       - ".eslintrc*"
       - "vite.config.*"
+      - "playwright.config.*"
+      - "tests/e2e/**"
       - ".github/workflows/ci-web.yml"
   push:
     branches: [main]
@@ -38,3 +40,9 @@ jobs:
 
       - name: Vite build
         run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser smoke
+        run: pnpm test:e2e

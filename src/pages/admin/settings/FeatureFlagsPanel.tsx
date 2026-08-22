@@ -4,6 +4,7 @@ import { ConfirmDialog } from "../../../components/admin/AdminDialog";
 import { EmptyState } from "../../../components/common/EmptyState";
 import { ErrorState } from "../../../components/common/ErrorState";
 import { LoadingRows } from "../../../components/common/LoadingRows";
+import { InlineNotice } from "../../../components/common/InlineNotice";
 
 const FLAG_DEFINITIONS = [
   { key: "adminConsole", label: "Admin console", impact: "administration configuration" },
@@ -50,7 +51,7 @@ export default function FeatureFlagsPanel({ canManage }: { canManage: boolean })
   return <section aria-labelledby="feature-flags-title" className="space-y-4">
     <div><h3 id="feature-flags-title" className="text-lg font-semibold text-neutral-900">Feature flags</h3><p className="text-sm text-neutral-600">Tenant feature configuration. Day 8 records state but does not yet enforce existing routes.</p></div>
     {error ? <ErrorState message={error} onRetry={() => void load()} /> : null}
-    {notice ? <p role="status" className="rounded-lg border border-accent-500 bg-white p-3 text-sm font-semibold text-neutral-800">{notice}</p> : null}
+    {notice ? <InlineNotice message={notice} tone="success" /> : null}
     {missing.length ? <EmptyState title="Feature flag configuration incomplete" body={`Missing: ${missing.map((item) => item.label).join(", ")}.`} /> : null}
     <div className="divide-y divide-neutral-200 overflow-hidden rounded-lg border border-neutral-200 bg-white">{FLAG_DEFINITIONS.map((definition) => {
       const flag = flagsByKey.get(definition.key);

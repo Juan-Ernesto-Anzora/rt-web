@@ -72,7 +72,7 @@ type PresignedUploadDto = {
 
 export function normalizeAttachment(attachment: AttachmentDto): RequestCommentAttachment {
   return {
-    id: attachment.id ?? attachment.attachment_id ?? attachment.attachmentid ?? crypto.randomUUID(),
+    id: attachment.id ?? attachment.attachment_id ?? attachment.attachmentid ?? "",
     fileName: attachment.file_name ?? attachment.filename ?? "Attachment",
     size: attachment.size ?? attachment.size_bytes ?? attachment.sizebytes ?? 0,
     contentType: attachment.content_type ?? attachment.contenttype,
@@ -83,11 +83,11 @@ export function normalizeAttachment(attachment: AttachmentDto): RequestCommentAt
 
 function normalizeComment(comment: CommentDto): RequestComment {
   return {
-    id: comment.id ?? comment.commentid ?? crypto.randomUUID(),
+    id: comment.id ?? comment.commentid ?? "",
     authorName: comment.author_name ?? comment.author?.name ?? "Unknown user",
     body: comment.body ?? comment.message ?? "",
-    createdAt: comment.created_at ?? new Date().toISOString(),
-    attachments: (comment.attachments ?? []).map(normalizeAttachment),
+    createdAt: comment.created_at ?? "",
+    attachments: (comment.attachments ?? []).map(normalizeAttachment).filter((item) => item.id),
   };
 }
 
@@ -97,7 +97,7 @@ export async function listRequestComments(requestId: string) {
     { params: { page_size: 25, sort: "created_at" } },
   );
   const comments = Array.isArray(response.data) ? response.data : response.data.results ?? [];
-  return comments.map(normalizeComment);
+  return comments.map(normalizeComment).filter((comment) => comment.id && comment.createdAt);
 }
 
 export async function listRequestAttachments(requestId: string) {
@@ -106,7 +106,7 @@ export async function listRequestAttachments(requestId: string) {
     { params: { page_size: 50, sort: "-created_at" } },
   );
   const attachments = Array.isArray(response.data) ? response.data : response.data.results ?? [];
-  return attachments.map(normalizeAttachment);
+  return attachments.map(normalizeAttachment).filter((attachment) => attachment.id);
 }
 
 async function initUploads(requestId: string, files: File[]) {
@@ -181,10 +181,10 @@ export async function createRequestComment(requestId: string, body: string, file
   );
 
   return {
-    id: response.data.comment_id ?? crypto.randomUUID(),
+    id: response.data.comment_id ?? "",
     authorName: "Current user",
     body,
-    createdAt: new Date().toISOString(),
-    attachments: (response.data.attachments ?? []).map(normalizeAttachment),
+    createdAt: "",
+    attachments: (response.data.attachments ?? []).map(normalizeAttachment).filter((item) => item.id),
   };
 }

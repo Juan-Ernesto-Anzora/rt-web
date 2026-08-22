@@ -93,5 +93,5 @@ export function canAccessAdmin(profile: AuthzProfile) {
 }
 
 export function hasAdminDevOverride() {
-  return import.meta.env.VITE_ENABLE_ADMIN_DEV_OVERRIDE === "true";
+  return import.meta.env.DEV && import.meta.env.VITE_ENABLE_ADMIN_DEV_OVERRIDE === "true";
 }

@@ -18,58 +18,6 @@ import { PriorityChip } from "../components/requests/PriorityChip";
 import { StatusBadge } from "../components/requests/StatusBadge";
 import { createRequestComment, RequestComment } from "../features/requestActivity";
 
-const FALLBACK_DETAIL: RequestDetail = {
-  id: "RT-2025-001001",
-  title: "VPN not connecting",
-  description: "User cannot connect after password rotation. VPN client reports invalid profile.",
-  status: "Open",
-  statusIsTerminal: false,
-  priority: "High",
-  assigneeId: "demo-assignee",
-  assignee: "Ana Gomez",
-  requester: "Carlos Diaz",
-  flow: "IT Support",
-  dueAt: "2025-08-23T17:00:00Z",
-  createdAt: "2025-08-22T08:25:00Z",
-  updatedAt: "2025-08-22T10:41:00Z",
-  attachments: [
-    {
-      id: "attachment-001",
-      fileName: "vpn-error-screenshot.png",
-      size: 248_120,
-      contentType: "image/png",
-      scanStatus: "clean",
-    },
-  ],
-};
-
-const FALLBACK_COMMENTS: RequestComment[] = [
-  {
-    id: "comment-001",
-    authorName: "Ana Gomez",
-    body: "Confirmed the VPN profile fails after password rotation. Waiting on network team review.",
-    createdAt: "2025-08-22T11:20:00Z",
-    attachments: FALLBACK_DETAIL.attachments,
-  },
-];
-
-const FALLBACK_ACTIVITY: RequestActivityEvent[] = [
-  {
-    id: "activity-001",
-    actorName: "Carlos Diaz",
-    verb: "created request",
-    createdAt: "2025-08-22T08:25:00Z",
-  },
-  {
-    id: "activity-002",
-    actorName: "Ana Gomez",
-    verb: "added comment",
-    createdAt: "2025-08-22T11:20:00Z",
-  },
-];
-
-const ENABLE_DEMO_DETAIL_FALLBACK = import.meta.env.VITE_ENABLE_DEMO_DETAIL_FALLBACK === "true";
-
 type ApiErrorBody = {
   code?: string;
   message?: string;
@@ -523,13 +471,6 @@ export default function RequestDetailPage() {
         setError(null);
       } catch {
         if (cancelled) return;
-        if (ENABLE_DEMO_DETAIL_FALLBACK) {
-          setDetail({ ...FALLBACK_DETAIL, id: requestId });
-          setComments(FALLBACK_COMMENTS);
-          setActivity(FALLBACK_ACTIVITY);
-          setError("Could not load request detail from API. Showing local demo data.");
-          return;
-        }
         setDetail(null);
         setComments([]);
         setActivity([]);
@@ -697,7 +638,7 @@ export default function RequestDetailPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <header className="border-b border-neutral-200 bg-white px-6 py-4">
+      <header className="border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -717,7 +658,7 @@ export default function RequestDetailPage() {
         </div>
       </header>
 
-      <main className="grid grid-cols-[minmax(0,1fr)_320px] gap-4 p-6">
+      <main className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {error && <ErrorState message={error} />}
 

@@ -23,6 +23,9 @@ import { AdminDialog, ConfirmDialog } from "../../components/admin/AdminDialog";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingRows } from "../../components/common/LoadingRows";
+import { InlineNotice } from "../../components/common/InlineNotice";
+import { PaginationControls } from "../../components/common/PaginationControls";
+import { StateBadge } from "../../components/common/StateBadge";
 
 type ConfirmState = { title: string; body: string; label: string; run(): Promise<void> } | null;
 
@@ -168,11 +171,11 @@ export default function AdminUsersPage() {
         <button type="button" onClick={() => setCreateOpen(true)} className="btn btn-primary">Create RT user</button>
       </div>
 
-      {notice ? <div role="status" className="rounded-lg border border-accent-500 bg-white px-4 py-3 text-sm font-semibold text-neutral-800">{notice}</div> : null}
+      {notice ? <InlineNotice message={notice} tone="success" /> : null}
       {mutationError ? <ErrorState message={mutationError} /> : null}
 
       <form onSubmit={submitSearch} className="flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-        <label className="min-w-64 flex-1 text-sm font-semibold text-neutral-700">
+        <label className="min-w-0 flex-1 basis-full text-sm font-semibold text-neutral-700 sm:basis-auto">
           Search users
           <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} placeholder="Email or display name" className="mt-1 h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 font-normal text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600" />
         </label>
@@ -198,19 +201,16 @@ export default function AdminUsersPage() {
         <EmptyState title="No RT users found" body="Adjust the filters or create a Request Tracker user for this tenant." />
       ) : (
         <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600"><tr><th className="px-4 py-3">User</th><th className="px-4 py-3">Employee code</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Updated</th><th className="px-4 py-3"><span className="sr-only">Actions</span></th></tr></thead>
+          <table className="w-full min-w-[720px] text-left text-sm"><caption className="sr-only">Tenant Request Tracker users</caption>
+            <thead className="border-b border-neutral-200 bg-neutral-50 text-neutral-600"><tr><th scope="col" className="px-4 py-3">User</th><th scope="col" className="px-4 py-3">Employee code</th><th scope="col" className="px-4 py-3">Status</th><th scope="col" className="px-4 py-3">Updated</th><th scope="col" className="px-4 py-3"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody className="divide-y divide-neutral-100">
-              {users.map((user) => <tr key={user.userId} className="h-12 hover:bg-neutral-50"><td className="px-4"><div className="font-semibold text-neutral-900">{userLabel(user)}</div><div className="text-neutral-600">{user.email}</div></td><td className="px-4 text-neutral-700">{user.employeeCode ?? "-"}</td><td className="px-4"><span className={`rounded px-2 py-1 text-xs font-semibold ${user.isActive ? "bg-primary-50 text-primary-700" : "bg-neutral-100 text-neutral-700"}`}>{user.isActive ? "Active" : "Inactive"}</span></td><td className="px-4 text-neutral-600">{formatDate(user.updatedAt ?? user.createdAt)}</td><td className="px-4 text-right"><button type="button" onClick={() => setSelectedUserId(user.userId)} className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 hover:bg-neutral-50">Open</button></td></tr>)}
+              {users.map((user) => <tr key={user.userId} className="h-12 hover:bg-neutral-50"><td className="px-4"><div className="font-semibold text-neutral-900">{userLabel(user)}</div><div className="text-neutral-600">{user.email}</div></td><td className="px-4 text-neutral-700">{user.employeeCode ?? "-"}</td><td className="px-4"><StateBadge label={user.isActive ? "Active" : "Inactive"} tone={user.isActive ? "primary" : "neutral"} /></td><td className="px-4 text-neutral-600">{formatDate(user.updatedAt ?? user.createdAt)}</td><td className="px-4 text-right"><button type="button" onClick={() => setSelectedUserId(user.userId)} aria-label={`Open ${userLabel(user)}`} className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600">Open</button></td></tr>)}
             </tbody>
           </table>
         </div>
       )}
 
-      <div className="flex items-center justify-between text-sm text-neutral-600">
-        <span>{count} users</span>
-        <div className="flex gap-2"><button type="button" disabled={page <= 1} onClick={() => { const next = new URLSearchParams(params); next.set("page", String(page - 1)); setParams(next); }} className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold disabled:opacity-50">Previous</button><button type="button" disabled={page * 25 >= count} onClick={() => { const next = new URLSearchParams(params); next.set("page", String(page + 1)); setParams(next); }} className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold disabled:opacity-50">Next</button></div>
-      </div>
+      <PaginationControls page={page} pageSize={25} count={count} label="users" onPageChange={(nextPage) => { const next = new URLSearchParams(params); next.set("page", String(nextPage)); setParams(next); }} />
 
       {selectedUserId ? (
         <UserDetail
