@@ -4,6 +4,7 @@ import {
   AdminTransition,
   AdminWorkflow,
   AdminWorkflowDetail,
+  createAdminWorkflow,
   createAdminStatus,
   createAdminTransition,
   getAdminWorkflow,
@@ -11,7 +12,9 @@ import {
   readableApiError,
   updateAdminStatus,
   updateAdminTransition,
+  updateAdminWorkflow,
 } from "../../api/adminWorkflows";
+import { AdminDialog } from "../../components/admin/AdminDialog";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingRows } from "../../components/common/LoadingRows";
@@ -125,7 +128,7 @@ function WorkflowList({
   onSelect: (workflow: AdminWorkflow) => void;
 }) {
   if (!workflows.length) {
-    return <EmptyState title="No workflows found." body="Create workflows through the admin API before editing statuses." />;
+    return <EmptyState title="No workflows found." body="Use New to create a workflow, then add statuses and transitions." />;
   }
 
   return (
@@ -164,11 +167,11 @@ function StatusEditor({
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
-  const statusDrafts = useMemo(
+  const savedStatusDrafts = useMemo(
     () => detail.statuses.map((status) => (status.statusId === editingId ? draft : statusToDraft(status))),
     [detail.statuses, draft, editingId],
   );
-  const validationMessages = validationForStatuses(statusDrafts);
+  const validationMessages = validationForStatuses(detail.statuses.map((status) => statusToDraft(status)));
 
   function editStatus(status: AdminStatus) {
     setEditingId(status.statusId);
@@ -184,13 +187,15 @@ function StatusEditor({
   async function saveStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setNotice(null);
-    const messages = validationForStatuses(statusDrafts);
+    const candidateStatuses = editingId ? savedStatusDrafts : [...savedStatusDrafts, draft];
+    const messages = validationForStatuses(candidateStatuses);
     if (!draft.name.trim()) {
       setNotice({ tone: "error", message: "Status name is required." });
       return;
     }
-    if (messages.length) {
-      setNotice({ tone: "error", message: messages.join(" ") });
+    const blockingMessages = editingId ? messages : messages.filter((message) => message.startsWith("Duplicate status names:"));
+    if (blockingMessages.length) {
+      setNotice({ tone: "error", message: blockingMessages.join(" ") });
       return;
     }
 
@@ -503,6 +508,22 @@ function TransitionEditor({
   );
 }
 
+function WorkflowDetailsEditor({ workflow, saving, onSave }: { workflow: AdminWorkflow; saving: boolean; onSave(payload: { name: string; description: string | null }): void }) {
+  const [name, setName] = useState(workflow.name);
+  const [description, setDescription] = useState(workflow.description);
+  useEffect(() => { setName(workflow.name); setDescription(workflow.description); }, [workflow]);
+  const dirty = name.trim() !== workflow.name || description.trim() !== workflow.description;
+  return <form onSubmit={(event) => { event.preventDefault(); if (name.trim() && dirty) onSave({ name: name.trim(), description: description.trim() || null }); }} className="rounded-lg border border-neutral-200 bg-white p-4"><div className="text-sm font-semibold text-neutral-500">Workflow detail</div><div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-semibold text-neutral-700">Name *<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-neutral-300 px-3 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600" /></label><label className="text-sm font-semibold text-neutral-700">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600" /></label></div><div className="mt-3 flex flex-wrap justify-end gap-2"><button type="button" disabled={!dirty || saving} onClick={() => { setName(workflow.name); setDescription(workflow.description); }} className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">Cancel edits</button><button type="submit" disabled={!dirty || !name.trim() || saving} className="btn btn-primary disabled:opacity-50">{saving ? "Saving..." : "Save workflow"}</button></div></form>;
+}
+
+function CreateWorkflowDialog({ open, saving, onClose, onCreate }: { open: boolean; saving: boolean; onClose(): void; onCreate(payload: { name: string; description: string | null }): void }) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { if (!open) { setName(""); setDescription(""); setError(""); } }, [open]);
+  return <AdminDialog open={open} title="Create workflow" description="Create a tenant workflow, then configure its statuses and transitions." onClose={onClose}><form onSubmit={(event) => { event.preventDefault(); if (!name.trim()) { setError("Workflow name is required."); return; } setError(""); onCreate({ name: name.trim(), description: description.trim() || null }); }} className="space-y-4"><label className="block text-sm font-semibold text-neutral-700">Name *<input autoFocus value={name} onChange={(event) => setName(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-neutral-300 px-3 font-normal" /></label><label className="block text-sm font-semibold text-neutral-700">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 font-normal" /></label>{error ? <p role="alert" className="text-sm font-semibold text-danger-500">{error}</p> : null}<div className="flex justify-end gap-2"><button type="button" disabled={saving} onClick={onClose} className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold">Cancel</button><button type="submit" disabled={saving} className="btn btn-primary disabled:opacity-50">{saving ? "Creating..." : "Create workflow"}</button></div></form></AdminDialog>;
+}
+
 export default function WorkflowAdminPage() {
   const [workflows, setWorkflows] = useState<AdminWorkflow[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string>("");
@@ -511,14 +532,17 @@ export default function WorkflowAdminPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [listError, setListError] = useState("");
   const [detailError, setDetailError] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [workflowNotice, setWorkflowNotice] = useState<Notice | null>(null);
 
-  const loadWorkflows = useCallback(async () => {
+  const loadWorkflows = useCallback(async (preferredFlowId?: string) => {
     setLoadingList(true);
     setListError("");
     try {
       const nextWorkflows = await listAdminWorkflows();
       setWorkflows(nextWorkflows);
-      setSelectedFlowId((current) => current || nextWorkflows[0]?.flowId || "");
+      setSelectedFlowId((current) => preferredFlowId ?? (nextWorkflows.some((workflow) => workflow.flowId === current) ? current : nextWorkflows[0]?.flowId ?? ""));
     } catch (error) {
       setListError(readableApiError(error, "Could not load workflows."));
     } finally {
@@ -552,6 +576,28 @@ export default function WorkflowAdminPage() {
 
   const selectedWorkflow = workflows.find((workflow) => workflow.flowId === selectedFlowId);
 
+  async function createWorkflow(payload: { name: string; description: string | null }) {
+    setWorkflowSaving(true); setWorkflowNotice(null);
+    try {
+      const created = await createAdminWorkflow(payload);
+      await loadWorkflows(created.flowId);
+      setCreateOpen(false);
+      setWorkflowNotice({ tone: "success", message: "Workflow created. Add statuses and transitions to complete it." });
+    } catch (error) { setWorkflowNotice({ tone: "error", message: readableApiError(error, "Could not create workflow.") }); }
+    finally { setWorkflowSaving(false); }
+  }
+
+  async function saveWorkflow(payload: { name: string; description: string | null }) {
+    if (!selectedFlowId) return;
+    setWorkflowSaving(true); setWorkflowNotice(null);
+    try {
+      await updateAdminWorkflow(selectedFlowId, payload);
+      await Promise.all([loadWorkflows(selectedFlowId), loadDetail(selectedFlowId)]);
+      setWorkflowNotice({ tone: "success", message: "Workflow updated." });
+    } catch (error) { setWorkflowNotice({ tone: "error", message: readableApiError(error, "Could not update workflow.") }); }
+    finally { setWorkflowSaving(false); }
+  }
+
   return (
     <div className="space-y-5">
       <div>
@@ -565,13 +611,7 @@ export default function WorkflowAdminPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="text-base font-semibold text-neutral-900">Workflows</h3>
-            <button
-              type="button"
-              onClick={() => void loadWorkflows()}
-              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
-            >
-              Refresh
-            </button>
+            <div className="flex gap-2"><button type="button" onClick={() => setCreateOpen(true)} className="btn btn-primary">New</button><button type="button" onClick={() => void loadWorkflows()} className="rounded-lg border border-neutral-300 px-3 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600">Refresh</button></div>
           </div>
           {loadingList && <LoadingRows rows={3} />}
           {!loadingList && listError && <ErrorState message={listError} onRetry={() => void loadWorkflows()} />}
@@ -585,16 +625,11 @@ export default function WorkflowAdminPage() {
         </section>
 
         <section className="space-y-6">
+          <SectionNotice notice={workflowNotice} />
           {!selectedWorkflow && !loadingList && (
             <EmptyState title="Select a workflow." body="Choose a workflow from the list to edit statuses and transitions." />
           )}
-          {selectedWorkflow && (
-            <div className="rounded-lg border border-neutral-200 bg-white p-4">
-              <div className="text-sm font-semibold text-neutral-500">Workflow detail</div>
-              <h3 className="mt-1 text-xl font-semibold text-neutral-900">{selectedWorkflow.name}</h3>
-              <p className="mt-1 text-sm text-neutral-600">{selectedWorkflow.description || "No description"}</p>
-            </div>
-          )}
+          {selectedWorkflow && <WorkflowDetailsEditor workflow={selectedWorkflow} saving={workflowSaving} onSave={(payload) => void saveWorkflow(payload)} />}
           {loadingDetail && <LoadingRows rows={4} />}
           {!loadingDetail && detailError && <ErrorState message={detailError} onRetry={() => void loadDetail()} />}
           {!loadingDetail && detail && !detailError && (
@@ -605,6 +640,7 @@ export default function WorkflowAdminPage() {
           )}
         </section>
       </div>
+      <CreateWorkflowDialog open={createOpen} saving={workflowSaving} onClose={() => setCreateOpen(false)} onCreate={(payload) => void createWorkflow(payload)} />
     </div>
   );
 }

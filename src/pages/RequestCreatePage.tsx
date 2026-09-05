@@ -1,7 +1,8 @@
 import { FocusEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { AxiosError } from "axios";
 import { useNavigate } from "react-router-dom";
-import { createRequest, CreateRequestPayload, FlowStatus, listFlowStatuses } from "../api/requestCreate";
+import { createRequest, CreateRequestPayload, FlowStatus, listFlowStatuses, listRequestFlows, type RequestFlow } from "../api/requestCreate";
+import { listTenantUsers, type TenantUser } from "../api/requestDetail";
 
 type FormValues = {
   title: string;
@@ -155,9 +156,28 @@ export default function RequestCreatePage() {
   const [statusesLoading, setStatusesLoading] = useState(false);
   const [statusesError, setStatusesError] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
+  const [flows, setFlows] = useState<RequestFlow[]>([]);
+  const [users, setUsers] = useState<TenantUser[]>([]);
+  const [lookupsLoading, setLookupsLoading] = useState(true);
+  const [lookupsError, setLookupsError] = useState<string | null>(null);
 
   const validationErrors = useMemo(() => validate(values), [values]);
   const openStatus = statuses.find((status) => status.isOpen);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadLookups() {
+      setLookupsLoading(true); setLookupsError(null);
+      try {
+        const [nextFlows, nextUsers] = await Promise.all([listRequestFlows(), listTenantUsers()]);
+        if (!cancelled) { setFlows(nextFlows); setUsers(nextUsers); }
+      } catch {
+        if (!cancelled) { setFlows([]); setUsers([]); setLookupsError("Could not load flow and user options from the API."); }
+      } finally { if (!cancelled) setLookupsLoading(false); }
+    }
+    void loadLookups();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -322,17 +342,9 @@ export default function RequestCreatePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <TextInput
-              id="flow_id"
-              label="Flow ID"
-              value={values.flow_id}
-              onChange={(value) => setValue("flow_id", value)}
-              onBlur={markTouched}
-              error={shownError("flow_id")}
-              helper="Paste the Flow ID. The Open status is loaded from this flow."
-              required
-            />
+          {lookupsError ? <div role="alert" className="rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm font-semibold text-danger-500">{lookupsError}</div> : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-semibold text-neutral-700" htmlFor="flow_id">Flow <span className="text-danger-500">*</span><select id="flow_id" value={values.flow_id} disabled={lookupsLoading || posting} onChange={(event) => setValue("flow_id", event.target.value)} onBlur={markTouched} aria-invalid={Boolean(shownError("flow_id"))} className="mt-1 h-10 w-full rounded-lg border border-neutral-300 px-3 font-normal focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-50"><option value="">{lookupsLoading ? "Loading flows..." : "Select flow"}</option>{flows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}</select>{shownError("flow_id") ? <FieldError message={shownError("flow_id")} /> : <span className="mt-1 block text-xs font-normal text-neutral-600">The Open status loads from the selected workflow.</span>}</label>
 
             <div>
               <label className="mb-1 block text-sm font-semibold text-neutral-700" htmlFor="priority">
@@ -358,7 +370,7 @@ export default function RequestCreatePage() {
             {statusesLoading && <div className="mt-1 text-neutral-600">Loading statuses for selected flow...</div>}
             {!statusesLoading && openStatus && (
               <div className="mt-1">
-                {openStatus.name} <span className="text-neutral-600">({openStatus.id})</span>
+                {openStatus.name}
               </div>
             )}
             {!statusesLoading && !openStatus && (
@@ -366,28 +378,12 @@ export default function RequestCreatePage() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <TextInput
-              id="requester_id"
-              label="Requester ID"
-              value={values.requester_id}
-              onChange={(value) => setValue("requester_id", value)}
-              onBlur={markTouched}
-              error={shownError("requester_id")}
-              helper="Paste the requester user ID."
-              required
-            />
-            <TextInput
-              id="assignee_id"
-              label="Assignee ID"
-              value={values.assignee_id}
-              onChange={(value) => setValue("assignee_id", value)}
-              onBlur={markTouched}
-              helper="Leave blank to send assignee_id as null."
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-semibold text-neutral-700" htmlFor="requester_id">Requester <span className="text-danger-500">*</span><select id="requester_id" value={values.requester_id} disabled={lookupsLoading || posting} onChange={(event) => setValue("requester_id", event.target.value)} onBlur={markTouched} aria-invalid={Boolean(shownError("requester_id"))} className="mt-1 h-10 w-full rounded-lg border border-neutral-300 px-3 font-normal"><option value="">{lookupsLoading ? "Loading users..." : "Select requester"}</option>{users.map((user) => <option key={user.id} value={user.id}>{user.displayName ?? user.email ?? user.label}</option>)}</select>{shownError("requester_id") ? <FieldError message={shownError("requester_id")} /> : null}</label>
+            <label className="text-sm font-semibold text-neutral-700" htmlFor="assignee_id">Assignee<select id="assignee_id" value={values.assignee_id} disabled={lookupsLoading || posting} onChange={(event) => setValue("assignee_id", event.target.value)} onBlur={markTouched} className="mt-1 h-10 w-full rounded-lg border border-neutral-300 px-3 font-normal"><option value="">Unassigned</option>{users.map((user) => <option key={user.id} value={user.id}>{user.displayName ?? user.email ?? user.label}</option>)}</select><span className="mt-1 block text-xs font-normal text-neutral-600">Unassigned sends assignee_id as null.</span></label>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <TextInput
               id="tags"
               label="Tags"
@@ -415,7 +411,7 @@ export default function RequestCreatePage() {
             >
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={posting}>
+            <button type="submit" className="btn btn-primary" disabled={posting || lookupsLoading || Boolean(lookupsError)}>
               {posting ? "Creating" : "Create Request"}
             </button>
           </div>

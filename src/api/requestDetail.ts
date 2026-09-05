@@ -2,7 +2,6 @@ import api from "../lib/api";
 import {
   RequestComment,
   RequestCommentAttachment,
-  createRequestComment,
   listRequestAttachments,
   listRequestComments,
   normalizeAttachment,
@@ -235,12 +234,8 @@ export async function applyRequestTransition(requestId: string, payload: ApplyTr
   const comment = payload.comment?.trim();
   await api.post(`/requests/${encodeURIComponent(requestId)}/transition/`, {
     transition_id: payload.transitionId,
-    comment_markdown: comment || undefined,
+    comment: comment || "",
   });
-
-  if (comment) {
-    await createRequestComment(requestId, comment, []);
-  }
 }
 
 export async function getRequestDetail(requestId: string): Promise<RequestDetail> {

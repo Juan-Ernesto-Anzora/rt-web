@@ -47,6 +47,15 @@ export type FlowStatus = {
   isOpen: boolean;
 };
 
+export type RequestFlow = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+type FlowDto = { flow_id?: string; name?: string; description?: string | null };
+type FlowListDto = { results?: FlowDto[] };
+
 function normalizeCreatedRequest(data: CreateRequestDto): CreateRequestResult {
   return {
     requestId: data.request_id ?? "",
@@ -70,6 +79,12 @@ export async function listFlowStatuses(flowId: string) {
   const response = await api.get<StatusListDto | StatusDto[]>(`/flows/${encodeURIComponent(flowId)}/statuses/`);
   const statuses = Array.isArray(response.data) ? response.data : response.data.results ?? [];
   return statuses.map(normalizeStatus).filter((status) => status.id);
+}
+
+export async function listRequestFlows() {
+  const response = await api.get<FlowListDto | FlowDto[]>("/flows/", { params: { page: 1, page_size: 100 } });
+  const flows = Array.isArray(response.data) ? response.data : response.data.results ?? [];
+  return flows.map((flow) => ({ id: flow.flow_id ?? "", name: flow.name ?? "Unnamed flow", description: flow.description ?? "" })).filter((flow) => flow.id);
 }
 
 export async function createRequest(payload: CreateRequestPayload) {
