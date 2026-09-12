@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA/settings/audit screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds reports, export, and SLA administration. Day 8 adds tenant settings, feature flags, and plain-text notification-template administration. Day 9 is a release-preparation milestone: route-level error handling, removal of remaining demo fallbacks, accessibility/responsive consistency, the already-contracted Admin Audit UI, and minimal automated browser smoke coverage.
+Sprint 3 adds a permission-aware administration area for Request Tracker configuration. After this sprint, authorized users can open an Admin section, navigate workflow/user/role/report/SLA/settings/audit screens, and see clear access-denied, loading, empty, and error states instead of placeholder alerts or broken routes. Day 7 adds reports, export, and SLA administration. Day 8 adds tenant settings, feature flags, and plain-text notification-template administration. Day 9 prepares the Web for release. Day 10 is the final hardening/demo gate: reconcile the browser UI with the validated API 0.2.0/OpenAPI/Postman contract, resolve only release-blocking demo defects, rehearse the full request/admin lifecycle on disposable data, and produce an evidence-based go/no-go decision.
 
 ## Repository orientation
 
@@ -27,16 +27,17 @@ This plan applies to `rt-web`. Relevant files and expected Sprint 3 edit targets
 - `src/components/common/EmptyState.tsx`, `ErrorState.tsx`, and `LoadingRows.tsx`: existing primitives to harden with semantic announcements and reuse consistently.
 - `src/components/requests/StatusBadge.tsx`, `PriorityChip.tsx`, and `RequestTable.tsx`: existing request display primitives; Day 9 should consolidate status/badge use and make request tables semantic/responsive.
 - `.github/workflows/ci-web.yml`: current Web CI runs install, typecheck, ESLint, and build only; Day 9 will add a minimal Chromium Playwright smoke command after documenting the dependency.
+- Adjacent API `docs/sprint-3-api-verification.md`, `docs/sprint-3-demo-script.md`, `docs/release-readiness.md`, `docs/sprint-3-known-issues.md`, `postman/RT-Sprint-3.postman_collection.json`, `postman/RT-Sprint-2-Regression.postman_collection.json`, and `postman/RT-Local.postman_environment.json`: Day 10 source evidence for exact operations, mutation guards, verified results, cleanup, and remaining limitations.
 - `design/design-tokens.json`, `tailwind.config.ts`, and `src/index.css`: design token mappings and shared compact UI classes.
 - `src/pages/`: new admin shell, admin landing, and forbidden page files should live here unless a more specific `src/pages/admin/` folder is introduced.
 - `src/components/common/`: existing `EmptyState`, `ErrorState`, and `LoadingRows` components for consistent loading/error UI.
 - `docs/plans/sprint-3/web-admin-configuration-execplan.md`: active ExecPlan for this sprint.
 
-Current routes in `src/main.tsx` include `/login`, `/search`, `/requests/new`, `/requests/:id`, `/profile/preferences`, `/403`, `/admin/*`, and `/`. `AdminShellPage` resolves `/admin`, `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/reports`, and `/admin/sla` inside the protected admin route. Day 8 will add `/admin/settings` within the same protected shell.
+Current routes in `src/main.tsx` include `/login`, `/search`, `/requests/new`, `/requests/:id`, `/profile/preferences`, `/403`, `/admin/*`, `/`, and friendly catch-all/error handling. `AdminShellPage` resolves `/admin`, `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/reports`, `/admin/sla`, `/admin/settings`, and `/admin/audit` inside the protected admin route.
 
 ## Current behavior
 
-The admin shell, API-backed route guard, 403 page, Admin -> Workflows, Admin -> Users/Memberships, Admin -> Roles & Permissions, Reports, CSV export, and SLA Policies are implemented. The permission context exposes normalized effective codes and gates report reads with `reports.read`, export with `reports.export`, and SLA administration with `sla.manage`.
+The admin shell, API-backed route guard, friendly error pages, Admin -> Workflows, Users/Memberships, Roles & Permissions, Reports/CSV, SLA Policies, Settings, Audit, request lifecycle pages, shared accessibility/responsive hardening, and Chromium smoke are implemented. The permission context exposes normalized effective codes and gates each area with the API-confirmed permissions.
 
 The adjacent API repository implements the Day 5-6 directory contract and generates it at `GET /api/schema`. The API server was not running during this planning pass and the local Poetry launcher could not generate a temporary schema, so the checked-in DRF routes, `extend_schema` declarations, serializers, services, tests, and API ExecPlan were inspected as the actual contract. Confirmed endpoints are:
 
@@ -55,7 +56,7 @@ The adjacent API `feat/api-sla-reports` worktree now provides the Day 7 contract
 - `GET/POST /api/admin/sla-policies/` and `GET/PATCH /api/admin/sla-policies/{sla_policy_id}/` with `sla.manage`, paginated list behavior, lowercase priorities, integer targets, and `is_active` deactivation.
 - `GET /api/flows/`, flow-status lookup, and `GET /api/users/` provide readable report filter labels while requests submit only non-empty public IDs.
 
-The adjacent API worktree `codex/feat-api-admin-settings` implements the Day 8 contract in DRF routes, serializers, services, tests, and an additive SQL upgrade. The API changes are currently uncommitted and the SQL upgrade has not been applied to the live development database, so Web implementation must first verify that the API branch is committed/available and the database has `TenantSetting`, `FeatureFlag`, and `NotificationTemplate` rows. Confirmed operations are:
+API `main` now includes the Day 8 Settings contract in DRF routes, serializers, services, tests, and additive SQL upgrades. Target environments must still apply the upgrade chain and verify `TenantSetting`, `FeatureFlag`, and `NotificationTemplate` rows. Confirmed operations are:
 
 - `GET /api/admin/settings/` requires baseline `admin.read` plus `admin.settings`; `PATCH /api/admin/settings/` additionally requires `tenant.settings.manage` and accepts one atomic `{ settings: [...] }` batch.
 - `GET /api/admin/feature-flags/` and `PATCH /api/admin/feature-flags/{key}/` require `featureflags.manage`. Keys are immutable and case-sensitive: `adminConsole`, `slaEnabled`, `exportsEnabled`, and `notificationTemplates`.
@@ -71,6 +72,16 @@ Day 9 repository inspection found these release gaps:
 - Request Detail uses `grid-cols-[minmax(0,1fr)_320px]` at every viewport. The Admin shell and most Admin pages already stack at `lg`/`xl`, but Users, Roles, Workflow, Reports, Settings, dialogs, tables, and action rows still need viewport verification and small overflow/focus fixes.
 - The existing API already supports `GET /api/admin/audit/` with `admin.audit.read`, pagination, and exact filters `type`, `actor_id`, `request_id`, `entity_id`, `created_from`, `created_to`, `page`, and `page_size`. Results expose `activity_id`, `request_id`, `actor_id`, `type`, raw `payload`, parsed `payload_json`, `entity_id`, `entity_type`, and `created_at`. The API does not return actor display names.
 - `package.json` and `pnpm-lock.yaml` contain no Playwright, Vitest, or Testing Library dependency or test script. CI has no browser job.
+
+Day 10 contract/rehearsal inspection found:
+
+- API `main` includes Admin Settings and API polish. The adjacent API final-hardening worktree reports OpenAPI `0.2.0` validation passing, 189 pytest tests passing, guarded read-only Postman 32/92 passing, Sprint 2 regression 8/17 passing, disposable mutation Postman 69/178 passing, SQL checks passing, four MailHog events present, and the original `rt` database restored with zero Day 10 records.
+- The API's generated `/api/schema` is the OpenAPI source and `tests/test_postman_contract.py` proves every Postman method/path exists in that schema. The Sprint 3 collection is secret-free, defaults `allow_mutation=false`, and guards every non-auth mutation for disposable-database use.
+- The current Web does not expose `POST/PATCH /api/admin/workflows/`; it can edit statuses/transitions only. Minimal workflow create/edit controls are a release-blocking completion for the requested browser demo.
+- The Web Request Create form still asks for raw Flow/Requester/Assignee IDs even though `/api/flows/`, flow-status, and `/api/users/` lookups exist. Replacing those fields with readable selectors is a release-blocking usability correction and prevents raw-ID demo handling.
+- Web transition submission sends `comment_markdown` and then creates a separate comment, while OpenAPI/Postman define `POST /api/requests/{requestid}/transition/` with `{ transition_id, comment }`. Day 10 must align to the exact contract and remove the duplicate workaround before rehearsal.
+- `POST /api/admin/users/` intentionally creates a domain user and current-tenant membership atomically. The API also supports standalone `POST /api/admin/memberships/` with `user_id`, but exposes no labelled eligible-nonmember lookup. A general standalone browser picker cannot be added safely without an API contract change.
+- Mutating browser rehearsal cannot be cleaned fully through public APIs because workflows/statuses/transitions/roles have no delete route and SLA cleanup is deactivation. It must run against a disposable/restorable clone and be discarded afterward.
 
 ## Desired behavior
 
@@ -114,6 +125,7 @@ The completed Day 1-4 foundation and planned Day 5-6 directory UI should provide
 - Admin Audit is visible only with `admin.audit.read`, uses real paginated API records and supported filters, resolves actor labels from the tenant-user lookup when possible, links only to valid known entities, and renders payload details as escaped readable text/fields.
 - Shared badges, form fields, notices, loading/empty/error states, and pagination reduce behavior/style drift without a broad redesign or unrelated refactor.
 - A minimal Playwright Chromium suite covers Sprint 3 navigation and unauthorized behavior with deterministic API interception; a separate manual smoke pass validates the deployed API/database integration.
+- Day 10 produces a deterministic 25-step browser script with route, exact API request/response, visible success evidence, and failure/no-go behavior for every step, plus security/direct-link/refresh/console/mobile checks.
 
 ## Scope
 
@@ -200,6 +212,19 @@ Out of scope for Day 9:
 - A design-system rewrite, new component framework, visual rebrand, charting, advanced analytics, cross-browser matrix, full regression suite, or broad unit-test migration.
 - Displaying raw stack traces, internal error objects, token/permission payloads, raw UUIDs as primary labels, unsanitized HTML, or sensitive setting/template values.
 - Treating mocked Playwright smoke tests as proof of full-stack API, tenancy, SQL, MinIO, Redis, MailHog, or permissions integration.
+
+In scope for Day 10 planning and subsequent hardening/rehearsal:
+
+- Minimal Web fixes required to execute the approved browser demo: workflow create/edit, readable Create Request lookups, and exact transition-comment payload behavior.
+- One disposable-database browser rehearsal covering all 25 requested actions, evidence capture, reversible-value restoration, and clone cleanup.
+- Negative non-admin/direct-URL verification, refresh/deep-link checks, console/network cleanliness, no-demo/raw-ID/raw-object assertions, and mobile sanity.
+- Updating Web verification/known-issues/release-readiness evidence and ExecPlan Outcomes after the rehearsal.
+
+Out of scope for Day 10:
+
+- A general standalone membership picker without a labelled eligible-user API contract. The demo uses the supported atomic user-plus-membership result and explicitly explains this design.
+- New admin delete/archive APIs, workflow builder redesign, invitations/login provisioning, notification inbox, SLA compliance, Spanish FTS tuning, cross-browser automation, or any unrelated product feature.
+- Mutating the normal `rt` database. The Day 10 browser demo is no-go unless a disposable/restorable clone, backup, unique suffix, and cleanup owner are confirmed.
 
 ## Implementation plan
 
@@ -486,6 +511,219 @@ Release verification and scope control:
 2. Run keyboard-only and responsive manual passes for the named screens, then one real authenticated ACME smoke against deployed API/SQL. Check browser console and Network for uncaught errors, failed route chunks, missing auth/tenant headers, and demo-data requests.
 3. Keep Day 9 to polish, Audit UI, tests, and release documentation. If the diff exceeds the repository's preferred PR size, split Audit UI from shared polish/Playwright while preserving this single milestone's acceptance criteria.
 
+### Milestone 8: Final hardening and browser demo
+
+User-visible outcome: a reviewer can follow one browser-only, tenant-scoped story from RT Admin login through configuration, a complete request lifecycle, notification evidence, and logout. Every action has contract-backed success/failure evidence, no hidden Postman step is needed during the browser narrative, and the original database is unchanged after the disposable environment is removed.
+
+Pre-demo release gates:
+
+1. Merge/deploy the API final-hardening commit and Web Day 9 commit; generate and validate OpenAPI `0.2.0`; confirm the Postman contract test still proves collection methods/paths exist in the generated schema.
+2. Back up the normal database and create a disposable clone such as `rt_browser_day10`. Apply the Sprint 3 upgrades in documented order plus the API polish upgrade. Never point the mutating browser demo at normal `rt`.
+3. Run API checks and guarded read-only Postman/Sprint 2 regression, then `db/verify-sprint3-release.sql`. Confirm required tables/columns/indexes/permissions, no duplicates/mismatches, and all services: SQL Server, MinIO, Redis, MailHog, API, and Web.
+4. Prepare secret-free local credentials outside source control: one ACME RT Admin, one ACME non-admin, one active disposable assignee/requester, and one separate disposable user safe to deactivate. Clear MailHog and browser storage. Use a unique suffix such as `WEB-D10-<timestamp>` for all created names/titles.
+5. Capture baseline values for the setting, feature flag, and notification template that will be changed. Prepare a small harmless text file for grouped upload. Open DevTools Console and Network with Preserve log enabled.
+6. Resolve three Web release blockers before rehearsal, with focused tests and no unrelated feature work:
+   - Add create/edit workflow calls and controls using exact `POST/PATCH /api/admin/workflows/` fields `name` and `description`.
+   - Replace raw Flow/Requester/Assignee ID inputs in `/requests/new` with readable `/api/flows/`, flow-status, and `/api/users/` selectors while still submitting IDs/null.
+   - Send transition comments as exact `{ transition_id, comment }` and remove the separate duplicate-comment workaround.
+7. Standalone membership creation is not a Day 10 Web addition. The browser demo explicitly presents the atomic membership returned by `POST /api/admin/users/` as the supported creation path. If stakeholders require a separate non-member picker and second POST, mark the demo no-go until OpenAPI adds a labelled eligible-user lookup.
+
+All API calls below must include `Authorization: Bearer <jwt>` and `X-Tenant: ACME`, except login/health and the presigned MinIO PUT. All API failures must use the canonical `{code,message,details[]}` envelope and remain local to the current page.
+
+#### Browser demo script
+
+1. **Login as RT Admin**
+   - Route: `/login`.
+   - Expected API request: `POST /api/auth/jwt/create` with `{username,password}` and `X-Tenant: ACME`.
+   - Expected response: `200` with nonempty `access` and optional `refresh` token.
+   - Expected visible result: browser routes to `/`; Home heading, tenant ACME, user label, and real KPI/list loading states appear.
+   - Failure behavior: `401/400` remains on Login with an announced readable error; no token is persisted and no authenticated shell/demo data appears.
+
+2. **Confirm Admin navigation**
+   - Route: `/`, then `/admin` from the Admin navigation item.
+   - Expected API request: `GET /api/admin/me/permissions/`.
+   - Expected response: `200` with ACME user context, `RT Admin`, `is_admin=true`, `can_read_audit=true`, and the approved 18 effective permission codes.
+   - Expected visible result: Admin entry is visible; `/admin` shows Overview, Workflows, Users, Roles & Permissions, Reports, SLA Policies, Settings, and Audit according to exact permissions.
+   - Failure behavior: missing/insufficient context hides Admin or routes direct access to friendly `/403`; permission-load failure shows retryable local error, never JWT claims or raw permission objects.
+
+3. **Review audit records**
+   - Route: `/admin/audit`.
+   - Expected API requests: `GET /api/admin/audit/?page=1&page_size=25` and `GET /api/users/` for readable actor labels; apply one supported type/date/entity filter.
+   - Expected response: `200 {count,next,previous,results}`; each result may contain `activity_id`, `request_id`, `actor_id`, `type`, `payload`, `payload_json`, `entity_id`, `entity_type`, `created_at`.
+   - Expected visible result: semantic table shows readable event/actor/entity/timestamp, expandable escaped payload details, pagination, and only valid request/admin-area links.
+   - Failure behavior: `403` stays inside Audit without breaking Admin; invalid UUID/date range maps `400 details[]` to filters; malformed payload is shown as unavailable/bounded text, never raw HTML/object rendering.
+
+4. **Create and edit a workflow**
+   - Route: `/admin/workflows`.
+   - Expected API requests: initial `GET /api/admin/workflows/`; `POST /api/admin/workflows/` with `{name:"WEB-D10-<suffix>",description:"Browser demo workflow"}`; then `PATCH /api/admin/workflows/{flow_id}/` with changed description.
+   - Expected responses: list `200`; create `201 {flow_id,name,description,created_at}`; patch `200` with the updated workflow.
+   - Expected visible result: create dialog closes, the new readable workflow is selected, edit state reflects the saved description, and list/detail refetch from server.
+   - Failure behavior: duplicate/invalid name shows inline `400/409`; form stays populated, no optimistic phantom workflow appears, and no raw ID is the primary label.
+
+5. **Create and edit statuses**
+   - Route: `/admin/workflows` with the new workflow selected.
+   - Expected API requests: `POST /api/admin/workflows/{flow_id}/statuses/` for `Open`, `In Progress`, and terminal `Closed` using `{name,category,is_terminal}`; edit one through `PATCH .../statuses/{status_id}/`.
+   - Expected responses: `201/200` clean status objects with `status_id`, `flow_id`, `name`, `category`, `is_terminal`, `created_at`.
+   - Expected visible result: all three readable statuses appear; open/closed lifecycle validation passes; edited label/state refreshes.
+   - Failure behavior: duplicate name, unsupported category, or missing open/closed coverage is blocked inline; API `409/400` preserves editor state and existing list.
+
+6. **Create and edit transitions**
+   - Route: `/admin/workflows`.
+   - Expected API requests: POST Open → In Progress and In Progress → Closed to `/api/admin/workflows/{flow_id}/transitions/` with `from_status_id`, `to_status_id`, optional guard JSON/auto rules; PATCH one transition's `auto_rules` through its detail path.
+   - Expected responses: `201/200` transition objects with public IDs, endpoints, guard fields, auto rules, and timestamp.
+   - Expected visible result: readable From → To rows appear and refresh after edit.
+   - Failure behavior: same-status or duplicate pair is blocked before request; malformed guard/auto-rule or backend conflict is readable and does not duplicate the transition.
+
+7. **Create and deactivate a domain user**
+   - Route: `/admin/users`.
+   - Expected API requests: `POST /api/admin/users/` with unique email/display name and `is_default_tenant=false`, creating the active demo user; separately `PATCH /api/admin/users/{disposable_user_id}/` with `{is_active:false}` for the prepared deactivation target.
+   - Expected responses: create `201 {user,membership}`; deactivate `200` user with `is_active=false`.
+   - Expected visible result: created RT domain user appears with active current-tenant membership and explicit no-login-credentials copy; separate user displays Inactive after confirmation.
+   - Failure behavior: duplicate email/validation maps inline; final-admin/shared-user safeguards show `409` warning and retain prior state; no claim is made that Django/OIDC login was created or disabled.
+
+8. **Confirm membership creation**
+   - Route: `/admin/users`, created user detail.
+   - Expected API request: verify with `GET /api/admin/memberships/?user_id={created_user_id}&page=1&page_size=100`. Membership creation itself was the atomic `POST /api/admin/users/` in step 7; no second POST is expected.
+   - Expected response: `200` paginated results containing the same `membership_id`, readable user, default-tenant state, roles, and `created_at` returned during creation.
+   - Expected visible result: Tenant membership panel shows ACME and Tenant member/Default tenant state without exposing UUIDs.
+   - Failure behavior: missing/mismatched membership is release-blocking and stops the demo. Do not paste a raw `user_id` into an improvised standalone form; a separately mandated membership POST is no-go pending labelled eligible-user lookup.
+
+9. **Create and edit a role**
+   - Route: `/admin/roles`.
+   - Expected API requests: `GET /api/admin/roles/?page=1&page_size=100&sort=name`; `POST /api/admin/roles/` with unique `{name,description}`; `PATCH /api/admin/roles/{role_id}/` with updated description.
+   - Expected responses: list page `200`; create `201`; patch `200`, all with clean role/permission fields.
+   - Expected visible result: custom role is selected, readable name/description appear, and the permission matrix loads.
+   - Failure behavior: duplicate/canonical-role rename conflict shows readable `409`; prior role remains selected and no duplicate appears.
+
+10. **Assign role to membership**
+    - Route: `/admin/users`, created user detail.
+    - Expected API requests: load membership/role options, then `POST /api/admin/memberships/{membership_id}/roles/` with `{role_id}`.
+    - Expected response: `201/200` membership object including the newly assigned readable role.
+    - Expected visible result: role badge appears in the membership panel after server refresh.
+    - Failure behavior: duplicate assignment `409`, cross-tenant/not-found `404`, or missing `admin.roles` stays local and leaves prior roles unchanged.
+
+11. **Review permissions**
+    - Route: `/admin/roles` with the custom role selected.
+    - Expected API requests: `GET /api/admin/permissions/?page=1&page_size=100` and `GET /api/admin/roles/{role_id}/`.
+    - Expected response: paginated permission catalogue and role detail with assigned permissions.
+    - Expected visible result: grouped readable permission matrix; optionally assign one harmless permission with `POST .../permissions/ {permission_code}` and observe refresh.
+    - Failure behavior: missing `admin.permissions` makes the matrix read-only; final-admin `admin.read` removal remains blocked/confirmed and `409` restores state.
+
+12. **Create and edit an SLA policy**
+    - Route: `/admin/sla`.
+    - Expected API requests: `GET /api/admin/sla-policies/`; `POST` with unique name, lowercase priority, positive integer response/resolution minutes, active true; `PATCH /api/admin/sla-policies/{sla_policy_id}/` with changed targets or active state.
+    - Expected responses: list `200`; create `201`; patch `200` public SLA policy object.
+    - Expected visible result: policy row shows readable priority, minute/duration hints, Active state, and updated values after refetch.
+    - Failure behavior: duplicate name, invalid priority/minutes, response greater than resolution, or `403` maps inline; dialog stays open and list remains accurate.
+
+13. **View reports**
+    - Route: `/admin/reports`.
+    - Expected API requests: lookup calls plus `GET /api/reports/summary/` using one applied filter such as `priority=normal`.
+    - Expected response: `200` exact server counts and `by_priority`/`by_status` arrays.
+    - Expected visible result: KPI tiles and semantic breakdown tables match the response; URL-backed filters remain stable.
+    - Failure behavior: `403/400/500` shows explicit error and no stale/fake KPI or chart values.
+
+14. **Export CSV**
+    - Route: `/admin/reports`.
+    - Expected API request: `GET /api/reports/requests/export/?format=csv` plus the currently applied report filters.
+    - Expected response: `200 text/csv; charset=utf-8` Blob with `Content-Disposition: attachment; filename="rt-requests-...Z.csv"` and approved columns.
+    - Expected visible result: Preparing state ends, file downloads with server filename, and success notice appears without navigation.
+    - Failure behavior: missing `reports.export` disables/explains control; `403`, export limit, or Blob JSON error is readable, object URL is revoked, and no fake file downloads.
+
+15. **Update a tenant setting**
+    - Route: `/admin/settings`, General settings.
+    - Expected API requests: `GET /api/admin/settings/`; atomic `PATCH /api/admin/settings/` with one changed row such as `{key:"default_page_size",value:"25",value_type:"integer"}`.
+    - Expected response: `200 {settings:[...]}` with normalized value/type/sensitivity metadata.
+    - Expected visible result: success notice, refreshed value, and no sensitive value exposure. Record the original value for restoration.
+    - Failure behavior: invalid type/range or missing write permission maps inline; edits remain dirty; no partial update or setting value is logged.
+
+16. **Toggle a feature flag**
+    - Route: `/admin/settings`, Feature flags.
+    - Expected API requests: `GET /api/admin/feature-flags/`; confirmed `PATCH /api/admin/feature-flags/{exactKey}/` with `{enabled:false|true}`. Use a reversible flag and restore it immediately.
+    - Expected response: `200` feature flag with exact case-sensitive key/current state.
+    - Expected visible result: confirmation for enabled → disabled, refreshed readable state, and success notice.
+    - Failure behavior: `403/404` retains prior state; no optimistic flip or key lowercasing; UI does not claim existing routes are enforced by the flag.
+
+17. **Edit and preview a notification template**
+    - Route: `/admin/settings`, Notification templates.
+    - Expected API requests: list/detail GET; local text-only preview makes no request; PATCH detail with changed `subject_template`, `body_template`, and/or `is_active` using only allowed placeholders.
+    - Expected response: `200` updated template with immutable ID/event type and active state.
+    - Expected visible result: sample preview is escaped plain text, saved template refetches, and success notice appears. Keep the custom request-created template active through step 24, then restore baseline.
+    - Failure behavior: unknown/malformed placeholder, HTML-looking text, multiline subject, or length error is visible and never executed/transformed silently; backend `400` remains authoritative.
+
+18. **Return to normal Request Tracker**
+    - Route: `/` via Back to Home.
+    - Expected API requests: `GET /api/dashboard/summary/` and tenant-scoped `GET /api/requests/?...`.
+    - Expected response: `200` real summary/list data.
+    - Expected visible result: normal app shell, Home KPIs/queues, New Request/Search, and no Admin state leaking into content.
+    - Failure behavior: unavailable/error states replace data honestly; no local rows, plausible zero substitution, or route-boundary takeover for known API failures.
+
+19. **Create a request**
+    - Route: `/requests/new`, then `/requests/{request_id}`.
+    - Expected API requests: `GET /api/flows/`, `GET /api/flows/{flow_id}/statuses/`, `GET /api/users/`; `POST /api/requests/` with title/description, lowercase priority, created workflow/status IDs, readable requester/optional assignee IDs/null, optional due date/tags.
+    - Expected response: `201` with public `request_id` and request fields.
+    - Expected visible result: selectors show names/emails rather than UUID entry; successful navigation uses exactly `/requests/{response.request_id}` and real detail loads `200`.
+    - Failure behavior: field errors map to readable controls; missing `request_id` blocks navigation with explicit error; never navigate to `/requests/-`, `/undefined`, human ID, or null.
+
+20. **Assign the request**
+    - Route: `/requests/{request_id}`.
+    - Expected API requests: `GET /api/users/`; `PATCH /api/requests/{request_id}/` with `{assignee_id:"<user_id>"}` or null, followed by real detail refresh.
+    - Expected response: `200` request/detail with assigned user ID/object as contracted.
+    - Expected visible result: Current Assignee shows display name/email, success state, and no raw object/ID.
+    - Failure behavior: `400/403/404` appears near assignment, old readable assignee remains, and no empty-string UUID is sent.
+
+21. **Add comment and files**
+    - Route: `/requests/{request_id}`.
+    - Expected API requests: `POST /api/attachments/init` with request/file metadata; presigned MinIO `PUT`; `POST /api/attachments/finalize` with request/group IDs, comment `message`, and finalized file metadata; then comments/attachments/detail refresh. A no-file comment uses `POST /api/requests/{request_id}/comments/ {body}`.
+    - Expected responses: init `200 {request_id,group_id,uploads}`; PUT `200/204`; finalize `201 {request_id,group_id,comment_id,attachments}`.
+    - Expected visible result: one comment bubble groups all uploaded files; filenames, sizes, scan states, and comment text appear from refreshed API data.
+    - Failure behavior: init/PUT/finalize error is readable, retry does not fabricate attachments/comments, optional IDs are not empty strings, and unfinalized files do not appear as complete.
+
+22. **Transition and close**
+    - Route: `/requests/{request_id}`.
+    - Expected API requests: `GET /api/requests/{request_id}/available-transitions/`; POST Open → In Progress then In Progress → Closed to `/transition/` with exact `{transition_id,comment}`; refresh detail/transitions/comments/activity after each.
+    - Expected response: each transition `200` updated request; subsequent detail/activity shows new status and transition/comment events. Closing triggers `request.closed` notification.
+    - Expected visible result: status changes Open → In Progress → Closed, terminal state has no invalid actions, each optional comment appears once, and timeline remains readable.
+    - Failure behavior: unavailable transition/required comment/backend validation is shown without PATCHing request detail; no duplicate comment workaround, stale action, raw payload object, or fake status.
+
+23. **Search**
+    - Route: `/search?q=WEB-D10-<suffix>`.
+    - Expected API request: `GET /api/search/requests?q=...&page=1&page_size=25&sort=-updated_at` plus applied supported filters.
+    - Expected response: `200 {count,page,page_size,results}` containing the created request when indexed/matched.
+    - Expected visible result: real semantic result row with readable ID/title/status/assignee/requester/flow and Open action using `request_id`.
+    - Failure behavior: API/index lag shows honest empty/error with retry guidance; no local search rows, `/requests/-`, raw object, or malformed-ID navigation.
+
+24. **Confirm notification**
+    - Route: MailHog browser `http://localhost:8025` (external demo tool), with Request Tracker still available in its tab.
+    - Expected API request: no new RT mutation is required; MailHog UI fetches its own message API. Evidence was generated by request created, assigned, comment-added/finalized, and closed actions.
+    - Expected response/evidence: four messages with unique recipients as applicable, Human ID/title/request ID/link, tenant `web_base_url`/`email_from`, and the custom request-created template previewed in step 17.
+    - Expected visible result: created, assigned, comment-added, and closed messages are readable and links target `/requests/{request_id}`.
+    - Failure behavior: missing/duplicate/wrong-recipient/link/template mail is release-blocking. Capture evidence and stop; do not resend blindly or claim UI success proves delivery. Restore template baseline after evidence.
+
+25. **Logout**
+    - Route: current RT tab user menu, ending at `/login`.
+    - Expected API request: none; Web clears access/tenant local storage and refresh token session storage, then Protected routing redirects.
+    - Expected response: not applicable.
+    - Expected visible result: Login page appears; Back/refresh/direct `/admin` cannot reopen authenticated content.
+    - Failure behavior: any retained Admin/request view, token in storage, or successful protected request after logout is release-blocking.
+
+#### Cross-cutting negative and presentation verification
+
+1. **Non-admin:** sign in with the prepared non-admin. Admin navigation is absent; Home/normal routes still work. Direct `/admin`, `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/reports`, `/admin/sla`, `/admin/settings`, and `/admin/audit` must resolve to friendly `/403` or a permission-local denial after `GET /api/admin/me/permissions/`, never render protected data.
+2. **Direct URLs and refresh:** as RT Admin, directly open and refresh every Admin route, `/requests/new`, a real `/requests/{request_id}`, and `/search?q=...`. Auth/tenant headers remain present after storage hydration; selected data refetches; unknown routes show friendly 404; no redirect loop/default router error appears.
+3. **Console/network cleanliness:** zero uncaught exceptions, React key/object-child warnings, failed chunk loads, stack traces, unhandled promise rejections, or unexpected `4xx/5xx`. Expected negative checks are identified and cleared before the success recording.
+4. **No local/demo fallback:** force one representative list/detail/search/report/settings failure. UI shows explicit error/empty state and no local request, local search, fake KPI, fake user/role/setting, generated server timestamp, or demo banner.
+5. **Identifier safety:** inspect navigation and requests throughout. No `/requests/-`, `/requests/undefined`, `/requests/null`, human-ID detail fetch, empty UUID string, or raw UUID as a primary label. Missing IDs disable links/actions.
+6. **No raw object rendering:** nested flow/status/requester/assignee, audit payload, errors, activity, and template text render as readable escaped text. No React object-child crash, `[object Object]`, raw exception, or `dangerouslySetInnerHTML` path.
+7. **Mobile sanity:** at 320×720, verify Login, Home, Admin navigation, Audit, Workflow, Users, Roles, Reports, SLA, Settings, Request Create, Request Detail, and Search. No document-level horizontal overflow, overlapping controls, clipped actions, lost dialog focus, or color-only status; wide tables scroll only inside labelled regions.
+
+#### Cleanup and evidence
+
+1. Restore changed setting, feature flag, and notification template from captured baselines; verify each GET after restore. Clear downloaded CSV/demo upload from the workstation if required by policy.
+2. Save screenshots or a concise evidence log for permissions, audit, workflow/status/transition, user/membership/role, SLA/report/CSV, settings/flag/template, request lifecycle/search, MailHog, non-admin 403, mobile, and clean console.
+3. Stop Web/API/services, discard `rt_browser_day10`, verify normal `rt` contains zero `WEB-D10-<suffix>` records, and retain backup/script checksums/commit/PR/OpenAPI/Postman/SQL evidence.
+4. Go only when every release-blocking browser step and negative check passes. Accepted limitations remain in `docs/sprint-3-known-issues.md`; any new defect gets owner/severity/reproduction before release decision.
+
 ## Tests and verification
 
 Run where available:
@@ -621,6 +859,21 @@ Manual Day 9 release smoke:
 8. Run the Chromium smoke suite and inspect failures/traces. Then perform one real ACME full-stack path through login, Users, Workflows, Reports, Settings, Audit, and unauthorized access after the API/SQL deployment is ready.
 9. Confirm production browser console contains no uncaught errors/warnings caused by the app, Network contains no local/demo endpoint or missing tenant/auth header, and the release checklist records any backend deployment dependency separately.
 
+Automated Day 10 hardening verification before the browser rehearsal:
+
+- Add focused client/component or Playwright contract tests proving workflow create uses POST, edit uses PATCH, successful writes select/refetch the returned workflow, and duplicate/conflict errors preserve form state.
+- Add Request Create coverage proving flows/users display readable labels, flow selection loads statuses, Open status is selected by ID, priorities are lowercase, optional assignee is null/omitted, and success navigates with response `request_id` only.
+- Add transition coverage proving Apply Action sends exactly `{transition_id,comment}`, never PATCHes request detail, never sends `comment_markdown`, creates no duplicate comment request, and refreshes detail/transitions/comments/activity.
+- Retain Day 9 Chromium smoke for Admin navigation/permissions/404/mobile and extend it only for the three hardening defects. Do not automate destructive full-demo mutations against shared infrastructure.
+- Run `pnpm tsc --noEmit`, `pnpm lint`, `pnpm build`, `pnpm test`, and `git diff --check`; run API/OpenAPI/Postman/SQL commands from the API verification notes before opening the disposable browser environment.
+
+Day 10 browser evidence checklist:
+
+- Record one line per script step with timestamp, route, API status/method/path, visible result, screenshot/evidence reference, and Pass/Fail/Blocked.
+- Record separate negative results for non-admin direct routes, refresh/deep links, forced API failure/no-demo behavior, ID safety, raw-object safety, console cleanliness, and 320px sanity.
+- Record baseline/restore values and disposable database name/backup/cleanup evidence. A step without observable API and UI evidence is not considered passed.
+- Update `docs/sprint-3-web-verification.md`, `docs/sprint-3-known-issues.md`, API release-readiness evidence, and this Outcomes section only after the rehearsal. Do not convert a blocked item to Passed from unit/Postman evidence alone.
+
 ## Acceptance criteria
 
 - `/admin` is registered and protected by authentication.
@@ -679,6 +932,17 @@ Manual Day 9 release smoke:
 - `@playwright/test` is the only new Day 9 test dependency. Chromium smoke covers login/Admin navigation, Users, Workflows, Reports, Settings, unauthorized behavior, and 404 with deterministic contract-shaped API mocks.
 - CI retains typecheck/lint/build and adds the minimal Playwright smoke command; manual release verification separately covers the real deployed API/database.
 - Day 9 introduces no large product feature, API mutation, new backend contract, design-system replacement, or local/demo fallback.
+- Day 10 starts only on a disposable/restorable database after API/Web/OpenAPI/Postman/SQL preflight passes; normal `rt` is never mutated by the browser rehearsal.
+- Web supports contract-exact workflow create/edit, readable Request Create selectors, and transition `{transition_id,comment}` without duplicate comment requests before the rehearsal begins.
+- The 25-step browser script records route, API request/status, response evidence, visible UI result, and failure/no-go behavior for every step.
+- Domain user creation demonstrates the API's atomic current-tenant membership result. No raw-ID standalone membership picker is added without a labelled eligible-user API contract.
+- The created workflow's Open/In Progress/Closed statuses and transitions drive the created request through assign, grouped comment/files, In Progress, Closed, search, and notification evidence.
+- Reversible setting/flag/template edits are restored; non-deletable demo configuration exists only in the discarded clone; normal `rt` is verified free of the unique demo suffix.
+- Non-admin and direct-URL checks prove friendly denial and no protected data. Refresh/deep links preserve auth/tenant headers without loops or developer error pages.
+- Browser Console/Network is clean; no local/demo fallback, `/requests/-`/undefined/null, empty UUID, raw object child, `[object Object]`, stack trace, or HTML execution is observed.
+- All required routes pass a 320px mobile sanity check with keyboard-visible focus, no page-level overflow, and no inaccessible action.
+- MailHog visibly proves created, assigned, comment-added, and closed messages with correct recipients/identifiers/links; Web success alone is not accepted as email evidence.
+- Final go/no-go and evidence are written to verification/known-issues/ExecPlan outcomes; blocked steps cannot be promoted from unit or Postman results alone.
 
 ## Progress
 
@@ -694,11 +958,16 @@ Manual Day 9 release smoke:
 - [x] Day 8 Milestone 6 planned against the implemented API settings/flags/templates contract.
 - [x] Milestone 6 implemented in Web against the inspected Day 8 API contract.
 - [x] Day 8 TypeScript, ESLint, production build, and diff validation pass through the available npm package scripts.
-- [ ] Day 8 authenticated API/browser verification remains blocked until the API branch is committed/available and its SQL upgrade is applied to the development environment.
+- [ ] Day 8 real API/browser verification is subsumed by the Day 10 disposable rehearsal; target SQL upgrades still require deployment evidence.
 - [x] Day 9 Milestone 7 planned after whole-application, API-audit-contract, responsive/accessibility, fallback, and test-stack inspection.
 - [x] Milestone 7 implemented with route/error hardening, no-demo production flows, shared accessibility/responsive polish, Admin Audit, Playwright smoke, CI, and release documentation.
 - [x] Day 9 typecheck, ESLint, production build, Chromium smoke, and diff validation pass through available npm package scripts.
-- [ ] Real authenticated ACME/API/SQL release smoke remains pending the API Sprint 3 polish merge/deployment and database upgrade application.
+- [ ] Real authenticated ACME/API/SQL release smoke remains pending the API final-hardening merge/deployment, target database upgrades, and Day 10 disposable rehearsal.
+- [x] Day 10 Milestone 8 planned from current Web behavior, generated OpenAPI route contract, validated Postman collections, API verification/demo/readiness notes, and known issues.
+- [x] Release-blocking Web hardening completed: workflow create/edit, incremental empty-workflow status creation, readable Request Create lookups, and exact transition comment payload.
+- [x] Seven Chromium tests pass for existing Sprint 3 smoke plus workflow POST/PATCH/status, Request Create IDs/null/navigation, and single exact transition comment.
+- [ ] Disposable 25-step browser rehearsal and cross-cutting negative/mobile/console checks passed with evidence.
+- [ ] Reversible values restored, disposable clone removed, normal `rt` verified clean, and final Web/API release decision recorded.
 
 ## Surprises & Discoveries
 
@@ -756,6 +1025,16 @@ Manual Day 9 release smoke:
 - 2026-08-22: Playwright strict accessible-name matching exposed ambiguous partial selectors (`Admin` within the user-menu label and `Settings` within `General settings`). Exact role/name selectors now make the smoke suite resilient and reinforce explicit accessible naming.
 - 2026-08-22: The 320px browser smoke passes for Users, Roles, Workflows, Reports, Settings, Audit, and Request Detail with no document-level horizontal overflow.
 - 2026-08-22: API `feat/api-admin-settings` is merged, but the expanded Audit payload/entity/filter contract remains on the unmerged API Sprint 3 polish worktree. Web Audit is implemented against that inspected contract and full integration remains a release gate.
+- 2026-08-22: API Sprint 3 polish is now merged. The adjacent API final-hardening worktree contains secret-free Postman collections, a final demo script, SQL verification, and release-readiness evidence; API Day 10 reports 189 pytest tests and all guarded/mutating Postman assertions passing.
+- 2026-08-22: `tests/test_postman_contract.py` parses generated `/api/schema` and proves every collection method/path exists in OpenAPI. This gives the Web demo an authoritative operation list even though the API repository does not commit a static schema file.
+- 2026-08-22: Web Workflow Admin has no create/update workflow call or control, despite OpenAPI exposing POST/PATCH. Status/transition editors alone cannot execute the requested full browser demo.
+- 2026-08-22: Request Create still exposes raw Flow/Requester/Assignee ID inputs. Existing lookup endpoints are sufficient to correct this without an API change.
+- 2026-08-22: Web transition code sends `comment_markdown` and creates a second comment, while current `RequestTransitionSerializer` and Postman/OpenAPI use `comment`. The apparent UI success is a compatibility workaround, not contract compliance.
+- 2026-08-22: Standalone membership POST is contractually available but needs an existing non-member `user_id`; the API has no labelled eligible-user lookup. The safe browser behavior is the atomic membership returned by domain-user creation.
+- 2026-08-22: Workflow/status/transition/role records cannot be deleted through current public APIs. The API Day 10 team verified mutations on a disposable clone and removed it, establishing the required browser-demo environment pattern.
+- 2026-08-22: MailHog evidence is external browser evidence at the local MailHog UI, not an RT Web endpoint. Created/assigned/comment-added/closed triggers occur during the request lifecycle and must be correlated by Human ID/request ID.
+- 2026-08-22: Existing status validation evaluated only saved statuses and required Open plus Closed before allowing the first status, so a newly created empty workflow could not be configured through the UI. Day 10 now permits incremental creates while preserving duplicate blocking and lifecycle warnings; edits still cannot remove required lifecycle coverage.
+- 2026-08-22: The live API health and schema routes returned 200, but the in-app browser had no authenticated session, the secret-free environment had empty credentials, and no disposable database target was verified. Mutating rehearsal stopped at `/login` by design.
 
 ## Decision Log
 
@@ -805,6 +1084,13 @@ Manual Day 9 release smoke:
 - 2026-08-22: Add only `@playwright/test` for Day 9, Chromium-only. Use mocked API contracts for deterministic Web smoke in CI and keep real-stack release smoke manual/optional so the Web job does not require SQL Server or service containers.
 - 2026-08-22: Extract shared components only where behavior is already duplicated across at least three screens. Day 9 is hardening, not a design-system rewrite.
 - 2026-08-22: If release-polish plus Audit exceeds the preferred PR size, split the implementation into shared polish/Playwright and Admin Audit PRs while keeping both under Milestone 7.
+- 2026-08-22: Treat workflow create/edit, readable Request Create lookups, and transition comment contract alignment as the only permitted Day 10 Web additions; each closes a demonstrated release-blocking gap in the approved script.
+- 2026-08-22: Present membership creation as the documented atomic result of `POST /api/admin/users/`. Do not add a raw UUID field or speculative cross-tenant/nonmember lookup to satisfy demo wording.
+- 2026-08-22: Use one newly created workflow with Open, In Progress, and Closed statuses plus two transitions to drive the later normal request lifecycle. This links Admin configuration to user-visible value and minimizes disposable data.
+- 2026-08-22: Use the workflow transition endpoint for both progress and close in the Web demo because the UI is action/transition-driven. The direct `/close/` endpoint remains Postman/regression coverage, not a second browser control.
+- 2026-08-22: Keep the custom request-created template active until the created request notification is confirmed, then restore baseline. Toggle a different reversible feature flag so notification evidence is not accidentally disabled.
+- 2026-08-22: Require disposable clone/backup/unique suffix/cleanup evidence before any mutating browser action. Lack of cleanup capability is a no-go, not an accepted demo residue.
+- 2026-08-22: A browser step passes only with both network-contract and visible-UI evidence. Unit, Playwright-mock, Postman, or SQL evidence may support but cannot substitute for the requested full-stack browser observation.
 
 ## Outcomes & Retrospective
 
@@ -836,4 +1122,12 @@ Milestone 7 outcome: routing now has a safe descendant `errorElement`, explicit 
 
 Shared Error/Loading/Notice/Pagination/StateBadge behavior now provides alert/status/busy semantics, named pagination controls, readable non-color-only state, semantic Home/Search/Admin tables, improved dialog focus restoration, and responsive app/Admin/Request Detail layouts. A read-only `/admin/audit` page uses the shared tenant-aware client, exact supported filters/pagination, tenant-user actor labels, safe entity-area links, and escaped expandable payloads under `admin.audit.read`.
 
-Day 9 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test`, and `git diff --check` pass. Playwright 1.62.1 runs four Chromium tests covering Admin login/navigation, Users, Workflows, Reports, Settings, Audit, unauthorized Admin access, friendly 404, and 320px overflow including Request Detail. The exact pnpm commands were attempted but the desktop wrapper aborted before scripts with its known no-TTY dependency-purge guard. CI now installs Chromium and runs the same browser smoke with pnpm. Real ACME full-stack verification remains pending API polish/SQL deployment and is documented in `docs/sprint-3-web-verification.md` and `docs/sprint-3-known-issues.md`.
+Day 9 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test`, and `git diff --check` pass. Playwright 1.62.1 runs four Chromium tests covering Admin login/navigation, Users, Workflows, Reports, Settings, Audit, unauthorized Admin access, friendly 404, and 320px overflow including Request Detail. The exact pnpm commands were attempted but the desktop wrapper aborted before scripts with its known no-TTY dependency-purge guard. CI now installs Chromium and runs the same browser smoke with pnpm. API polish has since merged; real ACME/SQL/browser verification is now the Day 10 release gate documented here and in the Web verification/known-issues files.
+
+Day 10 planning outcome: the final browser rehearsal is defined as a 25-step contract/UI/failure matrix plus non-admin, direct-link, refresh, console, no-demo, identifier, raw-object, mobile, restoration, and cleanup checks. Current generated OpenAPI/Postman/API release evidence is incorporated. Three Web release blockers are explicitly scoped for minimal correction, standalone membership wording is reconciled to the atomic API contract without inventing a picker, and no mutating demo may run outside a disposable clone. Implementation and full-stack browser evidence remain unchecked.
+
+Milestone 8 hardening outcome: Web Workflow Admin now creates and edits workflows through exact POST/PATCH operations and can configure the first status on an empty workflow without weakening duplicate/edit lifecycle protection. Request Create loads real flows/users/statuses, displays readable labels, submits internal IDs/null and lowercase priority, and navigates only with response `request_id`. Request transitions now send exact `{transition_id,comment}` and no longer create a duplicate separate comment.
+
+Day 10 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd test`, and `git diff --check` pass. Build transforms 139 modules; seven Chromium tests pass in 12.6 seconds. Live read-only API health/schema return 200. The exact pnpm commands were attempted but the desktop wrapper aborts before scripts with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; equivalent npm scripts pass and CI remains pnpm-based. The real mutating browser demo is Blocked at `http://127.0.0.1:5173/login` because no credentials/disposable target are available; no mutation was attempted against normal `rt`. Exact blocked routes are recorded in the demo and known-issues documents. Recommended commit: `fix(web): complete Sprint 3 browser demo hardening`. No real secrets or credentials are committed.
+
+Final Day 10 decision: **GO for the Web hardening commit/PR and automated CI; NO-GO for coordinated Sprint 3 release sign-off** until an authorized operator supplies local-only credentials for a verifiably disposable clone, completes all 25 browser steps plus negative/mobile/console checks, restores reversible values, removes the clone, and records evidence. This is an environment/evidence gate, not a hidden Web test failure.

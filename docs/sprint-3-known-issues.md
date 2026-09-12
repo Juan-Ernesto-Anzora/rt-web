@@ -2,11 +2,17 @@
 
 ## Release blockers
 
-### API Sprint 3 polish dependency
+### Authenticated disposable browser rehearsal
 
-The Web Audit page uses the expanded `/api/admin/audit/` contract with validated `entity_id`, date and pagination filters plus `payload_json`, `entity_id`, and `entity_type` response fields. At inspection time these changes are on the API `chore/api-sprint3-polish` worktree and are not yet merged into API `main`.
+The real 25-step mutating browser demo was blocked safely at `/login`: tracked credentials are intentionally empty and no disposable database target was verifiably active. The normal `rt` database was not mutated.
 
-Impact: basic audit rows can still render against the older endpoint, but entity filtering, parsed payload presentation, deterministic entity links, and full schema acceptance require the API polish merge/deployment.
+Impact: automated Web contracts pass, but full release sign-off still requires the exact routes in `docs/sprint-3-demo-script.md` against a disposable/restorable clone.
+
+Evidence: real browser route `http://127.0.0.1:5173/login`; downstream blocked routes are `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/sla`, `/admin/reports`, `/admin/settings`, `/requests/new`, `/requests/{request_id}`, `/search?q=WEB-D10-<suffix>`, and `http://localhost:8025`.
+
+### API final-hardening delivery
+
+API polish is merged. At inspection time the API Day 10 final-hardening worktree contains the Postman/demo/release artifacts and composite-removal fix but still requires its recommended commit/merge/deployment before the coordinated release candidate.
 
 ### Database upgrade deployment
 
@@ -41,6 +47,8 @@ Requests link directly to Request Detail. User, membership, role, workflow/statu
 ### Existing-user membership discovery
 
 The API does not expose a tenant-safe labelled lookup of domain users who are eligible to join but are not current members. The Web supports atomic RT-user/current-tenant membership creation and does not ask operators for raw user UUIDs.
+
+For the Day 10 browser demo, membership creation is evidenced by the atomic `{user,membership}` response and membership detail refresh. A separate standalone picker remains out of scope until a labelled eligible-user contract exists.
 
 ### Employee-code search
 

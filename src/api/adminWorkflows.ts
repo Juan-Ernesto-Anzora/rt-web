@@ -47,6 +47,11 @@ export type TransitionWritePayload = {
   auto_rules?: string | null;
 };
 
+export type WorkflowWritePayload = {
+  name: string;
+  description?: string | null;
+};
+
 type WorkflowDto = {
   flow_id?: string;
   name?: string;
@@ -161,6 +166,16 @@ export async function listAdminWorkflows() {
 export async function getAdminWorkflow(flowId: string) {
   const response = await api.get<WorkflowDetailDto>(`/admin/workflows/${encodeURIComponent(flowId)}/`);
   return normalizeWorkflowDetail(response.data);
+}
+
+export async function createAdminWorkflow(payload: WorkflowWritePayload) {
+  const response = await api.post<WorkflowDto>("/admin/workflows/", payload);
+  return normalizeWorkflow(response.data);
+}
+
+export async function updateAdminWorkflow(flowId: string, payload: WorkflowWritePayload) {
+  const response = await api.patch<WorkflowDto>(`/admin/workflows/${encodeURIComponent(flowId)}/`, payload);
+  return normalizeWorkflow(response.data);
 }
 
 export async function createAdminStatus(flowId: string, payload: StatusWritePayload) {

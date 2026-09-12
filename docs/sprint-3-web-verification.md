@@ -13,7 +13,7 @@ The Web uses the shared Axios client for JWT and `X-Tenant`. The Playwright suit
 | TypeScript | `npm.cmd run typecheck` | Passed |
 | ESLint | `npm.cmd run lint` | Passed |
 | Production build | `npm.cmd run build` | Passed, 139 modules transformed |
-| Browser smoke | `npm.cmd test` | Passed, 4 Chromium tests |
+| Browser smoke | `npm.cmd test` | Passed, 7 Chromium tests in 12.6 seconds |
 | Patch whitespace | `git diff --check` | Passed |
 
 The exact requested `pnpm lint`, `pnpm build`, and `pnpm test` commands were attempted. In this non-interactive Codex Windows runtime, the wrapper aborted during dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` before the scripts ran. The same package scripts passed through npm. CI remains configured to use pnpm on Ubuntu.
@@ -29,6 +29,16 @@ Chromium is the intentionally supported automated browser for this milestone. Th
 - Unauthorized Admin route behavior.
 - Friendly unknown-route 404.
 - 320px page-overflow smoke for Users, Roles, Workflows, Reports, Settings, Audit, and Request Detail.
+- Contract-exact workflow POST/PATCH and incremental first-status creation.
+- Readable Request Create lookups with internal ID/null payload and `request_id` navigation.
+- Exact transition `{transition_id,comment}` with no duplicate comment POST.
+
+## Day 10 API preflight
+
+- Live `GET http://127.0.0.1:8000/api/health`: 200, `{"status":"ok"}`.
+- Live `GET http://127.0.0.1:8000/api/schema`: 200, 105,745 bytes.
+- API release notes: 189 pytest tests, OpenAPI 0.2.0 validation, read-only Postman 32/92, Sprint 2 regression 8/17, disposable mutation Postman 69/178, SQL verification, and four MailHog events passed.
+- Tracked Postman environment has empty username/password/TOKEN and `allow_mutation=false`.
 
 ## Route and data verification
 
@@ -61,6 +71,29 @@ This remains a required manual/deployment check because CI Playwright mocks API 
 7. Force representative API failures and confirm no local/demo rows appear.
 8. Verify 320px and desktop layouts with keyboard-only navigation and browser console open.
 
+Day 10 live result: **BLOCKED at `/login` before credential submission**. No authenticated browser session or verifiably active disposable database target was available. The normal database is documented as clean, so no mutation was attempted. Exact blocked routes and the executable sequence are in `docs/sprint-3-demo-script.md`.
+
+## API calls validated by Day 10 Web browser tests
+
+- Workflow list/detail plus `POST /api/admin/workflows/`, `PATCH /api/admin/workflows/{flow_id}/`, and incremental `POST .../statuses/`.
+- Request Create lookups: `GET /api/flows/`, `GET /api/flows/{flow_id}/statuses/`, and `GET /api/users/`.
+- `POST /api/requests/` with public flow/status/requester IDs, lowercase priority, `assignee_id:null`, and navigation from response `request_id`.
+- `POST /api/requests/{request_id}/transition/` with exact `{transition_id,comment}` and zero duplicate POST to `/comments/`.
+- Existing smoke contracts for permission context, users, workflows, reports, settings, audit, dashboard/request detail, unauthorized Admin, friendly 404, and 320px overflow.
+
+The tests use explicit contract-shaped interceptions. Live read-only API calls separately validated `/api/health` and `/api/schema` only.
+
+## Secrets and credentials
+
+- No real username, password, JWT, refresh token, API key, presigned URL, or infrastructure credential was added.
+- `.env`/`.env.*` remain ignored.
+- The Playwright JWT and password are visibly synthetic local test fixtures and authorize only intercepted mock responses.
+- The API tracked Postman environment remains secret-free with empty credential/token values.
+
+## Recommended commit
+
+`fix(web): complete Sprint 3 browser demo hardening`
+
 ## Release status
 
-Web implementation and mocked-browser verification are complete. Full release acceptance remains conditional on the API Sprint 3 polish contract being merged/deployed and database upgrade requirements in [Sprint 3 known issues](sprint-3-known-issues.md) being resolved or explicitly accepted.
+Decision: **GO for the Web hardening commit/PR and CI; NO-GO for final coordinated release sign-off** until the disposable authenticated 25-step browser rehearsal and database restoration/cleanup evidence are complete. See [Sprint 3 known issues](sprint-3-known-issues.md).
