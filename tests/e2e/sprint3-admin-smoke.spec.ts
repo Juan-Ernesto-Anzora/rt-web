@@ -303,10 +303,12 @@ async function mockApi(page: Page, authorized = true) {
             activity_id: "80000000-0000-4000-8000-000000000001", 
             request_id: null, 
             actor_id: null, 
-            type: "role", 
-            object_type: "role", 
-            action: "updated", 
-            timestamp: new Date().toISOString() 
+            type: "admin.role.updated",
+            payload: '{"changed_fields":["description"]}',
+            payload_json: { changed_fields: ["description"] },
+            entity_id: "90000000-0000-4000-8000-000000000001",
+            entity_type: "role",
+            created_at: "2026-08-01T12:00:00Z",
           }] 
         });
       }

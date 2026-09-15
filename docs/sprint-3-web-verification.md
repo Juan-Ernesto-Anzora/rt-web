@@ -38,6 +38,7 @@ Chromium is the intentionally supported automated browser for this milestone. Th
 - Live `GET http://127.0.0.1:8000/api/health`: 200, `{"status":"ok"}`.
 - Live `GET http://127.0.0.1:8000/api/schema`: 200, 105,745 bytes.
 - API release notes: 189 pytest tests, OpenAPI 0.2.0 validation, read-only Postman 32/92, Sprint 2 regression 8/17, disposable mutation Postman 69/178, SQL verification, and four MailHog events passed.
+- API final-hardening PR #22 is merged. Infrastructure SQL validation is reported complete; current deployed Web/API/database versions remain unverified from this checkout.
 - Tracked Postman environment has empty username/password/TOKEN and `allow_mutation=false`.
 
 ## Route and data verification
@@ -96,4 +97,4 @@ The tests use explicit contract-shaped interceptions. Live read-only API calls s
 
 ## Release status
 
-Decision: **GO for the Web hardening commit/PR and CI; NO-GO for final coordinated release sign-off** until the disposable authenticated 25-step browser rehearsal and database restoration/cleanup evidence are complete. See [Sprint 3 known issues](sprint-3-known-issues.md).
+Decision: **Sprint 3 code baseline and API/SQL verification are recorded complete; final deployed Web sign-off remains unverified** until the authenticated 25-step browser rehearsal and environment-version evidence are supplied. See [Sprint 3 known issues](sprint-3-known-issues.md).

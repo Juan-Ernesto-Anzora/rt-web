@@ -15,6 +15,12 @@ An ExecPlan is a self-contained implementation plan that a coding agent or a new
 7. For API or UI contract changes, update OpenAPI or design tokens before implementation.
 8. Run the repo checks listed in `AGENTS.md` before suggesting a commit or PR.
 9. For auth, tenancy, uploads, search SQL, database, permissions, or workflows, include negative tests.
+10. Name the selected active ExecPlan in the task/prompt. Do not choose a plan from Sprint number, filename recency, or an old unchecked box.
+11. Reconcile user-reported completion with code, Git, and verification evidence. Preserve historical decisions, but do not restart completed implementation because an old Progress item was never checked.
+12. Run focused checks during iteration. Run the complete required check set at the PR gate, and rerun it only after relevant changes, failures, or unresolved risk justify the cost.
+13. Distinguish actual runners, intercepted/mock tests, and live-service checks. Missing tooling remains an explicit gap; never silently weaken a requirement or invent a command.
+14. Finish authorized work, make routine reversible choices that follow repository patterns, and ask only when material ambiguity changes the outcome or a real permission/managed-control boundary blocks progress.
+15. When an instruction causes a pause, block, or scope change, name the file and applicable rule and distinguish the rule from your interpretation.
 
 ## Where plans live
 
@@ -48,7 +54,7 @@ State what is in scope and out of scope.
 
 ## Implementation plan
 
-Write step-by-step milestones. Each milestone names files to edit, commands to run, and expected observations.
+Write step-by-step milestones. Each milestone names files to edit, focused iteration checks, the complete PR-gate checks, and expected observations. State whether each check uses local/mocked data or live services.
 
 ## Tests and verification
 
@@ -60,7 +66,7 @@ Use behavior-oriented criteria.
 
 ## Progress
 
-Use checkboxes and keep updated.
+Use checkboxes and keep updated. Separate implementation completion from deployment/live verification. Reconcile stale boxes explicitly instead of treating every unchecked historical item as active work.
 
 ## Surprises & Discoveries
 

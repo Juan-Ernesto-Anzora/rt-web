@@ -391,7 +391,7 @@ User-visible outcome: an authorized tenant administrator can open `/admin/settin
 
 Contract and deployment gate before implementation:
 
-1. Verify that the API Day 8 branch has been committed and its generated `/api/schema` contains the five route shapes. The inspected `codex/feat-api-admin-settings` worktree is currently uncommitted, so the Web must not be merged ahead of an available API contract.
+1. Verify that the API Day 8 contract is merged and its generated `/api/schema` contains the five route shapes. This gate is resolved in current API `main`; the earlier uncommitted-worktree observation is historical.
 2. Confirm infrastructure has applied `db/upgrade-sprint3-admin-settings.sql` to the development SQL Server. Until then, the endpoints may fail because the unmanaged models do not create their own tables.
 3. Reconfirm `GET /api/admin/me/permissions/` returns the exact Day 8 codes assigned for the active tenant. Do not infer access from role names or feature-flag values.
 4. Keep every call in the shared `src/lib/api.ts` client so `Authorization` and `X-Tenant` remain automatic. Do not put setting values or template content in URL parameters.
@@ -958,16 +958,18 @@ Day 10 browser evidence checklist:
 - [x] Day 8 Milestone 6 planned against the implemented API settings/flags/templates contract.
 - [x] Milestone 6 implemented in Web against the inspected Day 8 API contract.
 - [x] Day 8 TypeScript, ESLint, production build, and diff validation pass through the available npm package scripts.
-- [ ] Day 8 real API/browser verification is subsumed by the Day 10 disposable rehearsal; target SQL upgrades still require deployment evidence.
+- [x] Sprint 3 infrastructure SQL validation reported complete and the API release evidence records the expected SQL checks.
+- [ ] Day 8/10 real authenticated Web browser verification remains unexecuted; deployed target state is not established by this checkout.
 - [x] Day 9 Milestone 7 planned after whole-application, API-audit-contract, responsive/accessibility, fallback, and test-stack inspection.
 - [x] Milestone 7 implemented with route/error hardening, no-demo production flows, shared accessibility/responsive polish, Admin Audit, Playwright smoke, CI, and release documentation.
 - [x] Day 9 typecheck, ESLint, production build, Chromium smoke, and diff validation pass through available npm package scripts.
-- [ ] Real authenticated ACME/API/SQL release smoke remains pending the API final-hardening merge/deployment, target database upgrades, and Day 10 disposable rehearsal.
+- [x] API final-hardening PR #22 merged and API release evidence records its disposable Postman/SQL/MailHog run and cleanup.
+- [ ] Real authenticated ACME Web release smoke and deployed environment state remain unverified.
 - [x] Day 10 Milestone 8 planned from current Web behavior, generated OpenAPI route contract, validated Postman collections, API verification/demo/readiness notes, and known issues.
 - [x] Release-blocking Web hardening completed: workflow create/edit, incremental empty-workflow status creation, readable Request Create lookups, and exact transition comment payload.
 - [x] Seven Chromium tests pass for existing Sprint 3 smoke plus workflow POST/PATCH/status, Request Create IDs/null/navigation, and single exact transition comment.
 - [ ] Disposable 25-step browser rehearsal and cross-cutting negative/mobile/console checks passed with evidence.
-- [ ] Reversible values restored, disposable clone removed, normal `rt` verified clean, and final Web/API release decision recorded.
+- [ ] Web 25-step rehearsal restoration/cleanup evidence remains unavailable because that browser run was not executed. API disposable cleanup is complete and documented separately.
 
 ## Surprises & Discoveries
 
@@ -1003,7 +1005,7 @@ Day 10 browser evidence checklist:
 - 2026-08-17: The API worktree advanced to `feat/api-sla-reports` with concrete report summary/export and SLA serializers, views, routes, and tests. This removed the Day 7 contract blocker without requiring changes in the API repository.
 - 2026-08-17: Report date filters are DRF `DateTimeField` values, while the web controls are calendar dates. The shared filter serializer converts lower bounds to local-day start and upper bounds to local-day end, then sends ISO datetimes to both summary and export.
 - 2026-08-17: Export errors arrive as blobs because successful CSV requests use Axios `responseType: "blob"`; the client must parse JSON from an error blob before presenting API permission or validation text.
-- 2026-08-21: The adjacent API worktree `codex/feat-api-admin-settings` contains the complete Day 8 routes, serializers, services, tests, models, and additive SQL, but those changes are uncommitted and the upgrade script has not been applied to the live development database. Web implementation has a deployment/contract gate even though planning can use the code as the concrete schema.
+- 2026-08-21: The adjacent API worktree then contained the complete Day 8 contract before commit. Historical resolution: the settings and later final-hardening API work are now merged; deployment remains a separate evidence question.
 - 2026-08-21: Settings GET returns an object with a `settings` array, while feature flags and notification templates return bounded arrays without pagination. Settings PATCH is an atomic array; flags and templates PATCH one immutable path identity at a time.
 - 2026-08-21: Sensitive settings are not partially masked. The API returns `value=null`, `is_sensitive=true`, and `has_value`; therefore the Web must never use asterisks or a masked fragment as an editable value.
 - 2026-08-21: `default_timezone` and `default_page_size` are tenant configuration exposed to clients but do not currently alter Django process-global timezone or pagination. Help text must not promise runtime behavior the API does not implement.
@@ -1112,7 +1114,7 @@ Admin -> SLA Policies now lists and filters paginated policies, creates and edit
 
 Day 7 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` pass. The requested `pnpm lint` and `pnpm build` commands were attempted, but this non-interactive Windows runtime aborts during pnpm dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; neither script itself was reached. The equivalent package scripts pass through npm. No Vitest/React Testing Library dependencies or test script exist yet, so no component test command is available for this milestone.
 
-Day 8 outcome: `/admin/settings` now contains independently permissioned General Settings, Feature Flags, and Notification Templates sections backed by a typed shared-client module. General writes submit changed approved keys as one atomic batch; flags preserve exact case-sensitive keys and confirm enabled-to-disabled changes; template writes preserve immutable identity and preview exact allowed placeholders as plain text while leaving unknown placeholders unchanged and visibly invalid. Sensitive values never enter editable state, section-level `403` responses stay local, successful writes refetch server state, and dirty settings/templates block navigation. Authenticated API/browser verification remains pending until the API work and SQL upgrade are deployed.
+Day 8 outcome: `/admin/settings` now contains independently permissioned General Settings, Feature Flags, and Notification Templates sections backed by a typed shared-client module. General writes submit changed approved keys as one atomic batch; flags preserve exact case-sensitive keys and confirm enabled-to-disabled changes; template writes preserve immutable identity and preview exact allowed placeholders as plain text while leaving unknown placeholders unchanged and visibly invalid. Sensitive values never enter editable state, section-level `403` responses stay local, successful writes refetch server state, and dirty settings/templates block navigation. The API contract is merged and SQL validation is reported complete; authenticated deployed-browser verification remains unverified.
 
 Day 8 verification outcome: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build`, and `git diff --check` pass. `pnpm lint` and `pnpm build` were attempted as requested, but this non-interactive Windows runtime aborted during pnpm dependency preflight with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` before either script ran. The generated `.pnpm-store` was removed. No automated test command exists in the current Web package; focused component coverage remains part of Milestone 7.
 

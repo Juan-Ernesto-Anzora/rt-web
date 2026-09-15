@@ -16,6 +16,9 @@ export default defineConfig({
   webServer: {
     command: "npm run dev -- --host 127.0.0.1",
     url: "http://127.0.0.1:5173",
+    env: {
+      VITE_API_BASE: "http://127.0.0.1:8000/api",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
