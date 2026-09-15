@@ -10,13 +10,13 @@ Impact: automated Web contracts pass, but full release sign-off still requires t
 
 Evidence: real browser route `http://127.0.0.1:5173/login`; downstream blocked routes are `/admin/workflows`, `/admin/users`, `/admin/roles`, `/admin/sla`, `/admin/reports`, `/admin/settings`, `/requests/new`, `/requests/{request_id}`, `/search?q=WEB-D10-<suffix>`, and `http://localhost:8025`.
 
-### API final-hardening delivery
+### API final-hardening deployment evidence
 
-API polish is merged. At inspection time the API Day 10 final-hardening worktree contains the Postman/demo/release artifacts and composite-removal fix but still requires its recommended commit/merge/deployment before the coordinated release candidate.
+API final-hardening PR #22 is merged and its release artifacts record passing Postman, SQL, OpenAPI, and MailHog verification. This Web checkout does not establish which deployed environment, if any, runs that merged commit.
 
 ### Database upgrade deployment
 
-Sprint 3 API settings/audit schema changes use unmanaged Django models and companion SQL upgrades. Infrastructure must apply the approved upgrade scripts to the target SQL Server before the real-stack release smoke.
+Sprint 3 API settings/audit schema changes use unmanaged Django models and companion SQL upgrades. Infrastructure SQL validation is reported complete and API release evidence records successful disposable checks. Application of those upgrades to any shared/staging/production target remains unverified from this checkout.
 
 Impact: Settings or expanded audit behavior may fail even when Web and API code are correct.
 

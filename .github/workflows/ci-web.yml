@@ -7,9 +7,17 @@ on:
       - "pnpm-lock.yaml"
       - "tsconfig*.json"
       - ".eslintrc*"
+      - "eslint.config.*"
       - "vite.config.*"
       - "playwright.config.*"
       - "tests/e2e/**"
+      - "AGENTS.md"
+      - ".agent/**"
+      - ".codex/**"
+      - "docs/codex-prompts.md"
+      - "docs/plans/sprint-4/**"
+      - "README.md"
+      - "CODEOWNERS"
       - ".github/workflows/ci-web.yml"
   push:
     branches: [main]

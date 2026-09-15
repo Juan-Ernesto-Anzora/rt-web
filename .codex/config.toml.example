@@ -1,5 +1,8 @@
 # .codex/config.toml.example
 # Copy to .codex/config.toml if you want repo-local Codex defaults.
+model = "gpt-6-astra"
+
+# Keep an existing supported reasoning effort; this example does not override it.
 # Keep approvals and sandboxing conservative unless you intentionally loosen them.
 # Recommended project style:
 # - Plan first for multi-file features.

@@ -3,16 +3,16 @@
 > **Read this file in full before making any code changes.** Agents and contributors must follow these rules when proposing or committing changes.
 
 ## 1. Tech stack & architecture
-- **Frontend**: React (TypeScript), Vite, Tailwind (tokens mapped from `design-tokens.json`), shadcn/ui for primitives.
+- **Frontend**: React (TypeScript), Vite, Tailwind, and local primitives under `src/components/`.
 - **Backend**: Django + Django REST Framework; `djangorestframework-simplejwt` for local JWT during dev; path to OIDC kept ready.
 - **DB**: SQL Server (primary). Use Full-Text Search for keyword queries.
 - **Storage**: MinIO (S3-compatible) with **pre-signed uploads**.
 - **Async**: Celery + Redis (email, notifications, file scans). Realtime: **polling MVP**, **Django Channels** later.
 - **Tenancy**: single DB with `tenant_id` discriminator. All queries must be tenant-scoped.
-- **Spec-first**: `openapi-rt-with-examples.yaml` is the source of truth for endpoints, auth, pagination, and error shapes.
+- **Spec-first**: The sibling `rt-api` repository generates the source-of-truth contract at `GET /api/schema` with drf-spectacular. Verify that schema and the API serializers/tests before changing endpoint assumptions; do not invent Web endpoints.
 
 ## 2. Design system
-- **Tokens**: See `/design-tokens.json`. Never hardcode colors/spacing/typography.
+- **Tokens**: See `design/design-tokens.json` and `tailwind.config.ts`. Never hardcode colors/spacing/typography.
 - **Accessibility**: WCAG AA contrast, focus-visible outlines, tab order, ARIA labels for controls.
 - **Density**: compact by default; components support comfortable density.
 - **Status colors**: open/indigo, in-progress/indigo, waiting/amber, closed/neutral (see UI kit).
@@ -39,9 +39,11 @@
 - Log auditable events to `Activity` (who, what, when, request_id, payload).
 
 ## 6. Tests & quality (required before commit)
-- **Frontend**: unit tests (Vitest), component tests (Playwright or React Testing Library).
-- **Backend**: pytest + coverage ≥ 85%. FactoryBoy + pytest-django for data setup.
-- **Linters/formatters**: ESLint+Prettier (web), Ruff+Black+isort (api). Type-check with mypy/pyright.
+- **Current Web runners**: TypeScript (`pnpm typecheck`), ESLint (`pnpm lint`), Vite production build (`pnpm build`), and Playwright Chromium smoke (`pnpm test`).
+- **Test scope**: Playwright uses intercepted contract-shaped APIs by default; it does not prove live API, SQL Server, MinIO, Redis, Celery, MailHog, tenancy, or backend authorization behavior.
+- **Missing tooling**: Vitest and React Testing Library are not installed. Unit/component coverage remains a quality requirement when a change warrants it, but adding a runner requires an approved ExecPlan and dependency change. Never claim or invent an unavailable test command.
+- **Formatting/tooling gap**: Prettier is a stated Web formatting requirement but is not installed or scripted in this checkout. Preserve existing formatting and record the missing runner; do not claim Prettier ran or add it outside an approved tooling change.
+- **Backend checks**: pytest, Ruff, Black, isort, Django check, and OpenAPI validation run in the sibling `rt-api` repository as documented in its verification guide. Backend coverage/type-check tools not present there must not be claimed.
 - All tests and linters **must pass locally** and in CI **before** a PR is merged.
 
 ## 7. Git & branching (trunk-based)
@@ -79,18 +81,20 @@
 - Tag releases from CI on `main` after passing smoke E2E.
 
 ## 11. Local dev & scripts
-- `docker compose up` brings API + SQL Server + MinIO + Redis.
-- Seed data script: `./scripts/seed.sh` (tenants, users, flows).
-- Run web: `pnpm dev` (or `npm run dev`). Run API: `poetry run python manage.py runserver`.
+- Install Web dependencies: `pnpm install --frozen-lockfile`.
+- Create local Web env on PowerShell: `Copy-Item .env.example .env`; on POSIX: `cp .env.example .env`. Never commit `.env`.
+- Run Web: `pnpm dev`; preview a production build: `pnpm preview`.
+- The Web repository does not contain Docker Compose or seed scripts. Start and verify API/SQL Server/MinIO/Redis/MailHog through the sibling `rt-api` and `rt-infra` documentation.
+- The generated API contract is served by the sibling API at `http://localhost:8000/api/schema` when that service is running.
 
 ## 12. Agent workflow (how to operate)
 1) Read **this file end-to-end** and the current ticket.  
-2) Propose a short plan with acceptance criteria.  
-3) Update the OpenAPI or design tokens **first** if needed.  
-4) Implement incrementally, write tests as you go.  
-5) Run full lint+test locally.  
-6) Open a small PR with clear title/body and checklist.  
-7) Respond to review feedback and keep the PR up to date with `main`.
+2) Read `.agent/PLANS.md`, select and name the active ExecPlan when required, and treat completed/historical plans as evidence rather than authorization.
+3) State a short plan and acceptance criteria. Update the API OpenAPI source in `rt-api` or design tokens first when the requested contract changes.
+4) Finish authorized work end to end. Make routine, reversible implementation choices that follow existing patterns; ask only when a material ambiguity can change the outcome or a real permission/managed-control boundary blocks progress.
+5) Implement incrementally and run focused checks while iterating. Run the complete required Web check set at the PR gate; rerun it only after relevant changes, failures, or unresolved risk justify another pass.
+6) If an instruction causes a pause, block, or scope change, name the instruction file and applicable rule and distinguish the rule from your interpretation. Never bypass managed controls or explicit user scope.
+7) Open a small PR with clear title/body and checklist when requested. Respond to review feedback and keep the PR based on the intended current branch.
 
 ## 13. Ownership
 - See `CODEOWNERS` for paths and required reviewers.
@@ -112,8 +116,17 @@ For small single-file fixes, an ExecPlan is optional, but Codex must still state
 Before implementation, Codex must read:
 1. `AGENTS.md`
 2. `.agent/PLANS.md`
-3. the active ExecPlan for the branch
+3. the explicitly selected active ExecPlan for the branch/task
 4. any repo-specific design/API/token files referenced by the plan
+
+Do not infer the active plan from an old prompt, Sprint number, unchecked historical box, or filename recency. When a user reports a milestone complete, reconcile that report with code, Git, and verification evidence; leave deployment or live-service state unverified when this checkout cannot establish it.
+
+## 16. Instruction hierarchy and model scope
+
+- Preserve runtime-managed controls and explicit user scope. Apply this root file throughout the repository unless a nearer `AGENTS.md` provides a path-specific override.
+- Skills, ExecPlans, prompts, and historical notes guide execution within that hierarchy; they do not grant broader permissions or override a newer explicit user request.
+- The checked-in `.codex/config.toml.example` configures Codex development only. It does not add an OpenAI model or API integration to Request Tracker.
+- For GPT-6 Astra work, keep prompts direct about completion, material ambiguity, blocking rules, check scope, and expected output. Do not add repetitive instructions that already exist at a higher-priority layer.
 
 ---
 
