@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { ThemeProvider } from "./theme/ThemeProvider";
 import { Navigate, Outlet, RouterProvider, createBrowserRouter } from "react-router-dom";
 import { useAdminPermission } from "./auth/adminPermissions";
 import { AuthProvider, useAuth } from "./auth/useAuth";
@@ -126,8 +127,8 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <AuthProvider>
+    <ThemeProvider><AuthProvider>
       <AppErrorBoundary><Root /></AppErrorBoundary>
-    </AuthProvider>
+    </AuthProvider></ThemeProvider>
   </React.StrictMode>,
 );
