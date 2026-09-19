@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - "src/**"
+      - "design/**"
+      - "tailwind.config.*"
+      - "tests/tokens.test.cjs"
       - "package.json"
       - "pnpm-lock.yaml"
       - "tsconfig*.json"
@@ -42,6 +45,9 @@ jobs:
 
       - name: Type check
         run: pnpm tsc --noEmit
+
+      - name: Token contracts
+        run: pnpm test:tokens
 
       - name: ESLint
         run: pnpm eslint .
