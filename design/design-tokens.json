@@ -31,5 +31,39 @@
         "900": "#0F172A"
       }
     }
+  },
+  "color": {
+    "background": "{brand.colors.neutral.50}",
+    "foreground": "{brand.colors.neutral.900}",
+    "surface": "#FFFFFF",
+    "surface-subtle": "{brand.colors.neutral.50}",
+    "surface-raised": "#FFFFFF",
+    "surface-hover": "{brand.colors.neutral.100}",
+    "surface-active": "{brand.colors.primary.50}",
+    "text-default": "{brand.colors.neutral.900}",
+    "text-muted": "{brand.colors.neutral.600}",
+    "text-subtle": "{brand.colors.neutral.600}",
+    "text-inverse": "#FFFFFF",
+    "border": "{brand.colors.neutral.200}",
+    "border-strong": "{brand.colors.neutral.600}",
+    "action-primary": "{brand.colors.primary.600}",
+    "action-primary-hover": "{brand.colors.primary.700}",
+    "action-primary-foreground": "#FFFFFF",
+    "focus-ring": "{brand.colors.primary.600}",
+    "status-info": "#075985",
+    "status-info-surface": "#F0F9FF",
+    "status-success": "#065F46",
+    "status-success-surface": "#ECFDF5",
+    "status-warning": "#92400E",
+    "status-warning-surface": "#FFFBEB",
+    "status-danger": "#BE123C",
+    "status-danger-surface": "#FFF1F2"
+  },
+  "radius": {
+    "small": "4px",
+    "medium": "8px",
+    "large": "12px",
+    "legacy-control": "14px",
+    "legacy-card": "20px"
   }
 }

@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
+    "test:tokens": "node --test tests/tokens.test.cjs",
     "lint": "eslint .",
     "test": "playwright test",
     "test:e2e": "playwright test",
