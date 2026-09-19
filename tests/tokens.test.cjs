@@ -28,7 +28,8 @@ test("required semantic roles resolve; malformed and missing references fail", (
 });
 
 test("new text/status/action pairs meet AA and focus/strong borders meet non-text contrast", () => {
-  const c = mapping.resolvedColors;
+  for (const [theme, c] of Object.entries({ light: mapping.resolvedColors, dark: mapping.resolvedDarkColors })) {
+  assert.deepEqual(Object.keys(c).sort(), Object.keys(mapping.resolvedColors).sort());
   for (const text of ["foreground", "text-default", "text-muted", "text-subtle"]) {
     for (const surface of ["background", "surface", "surface-subtle", "surface-raised", "surface-hover", "surface-active"]) {
       assert.ok(contrast(c[text], c[surface]) >= 4.5, `${text} on ${surface}`);
@@ -47,7 +48,10 @@ test("new text/status/action pairs meet AA and focus/strong borders meet non-tex
     assert.ok(contrast(c["focus-ring"], c[surface]) >= 3);
     assert.ok(contrast(c["border-strong"], c[surface]) >= 3);
   }
-  console.log(`New danger contrast: ${contrast(c["status-danger"], c.surface).toFixed(2)}:1 on white`);
+  for (const [fg, bg] of [["foreground", "background"], ["text-muted", "background"], ["action-primary-foreground", "action-primary"], ...["info", "success", "warning", "danger"].map(s => [`status-${s}`, `status-${s}-surface`])]) {
+    console.log(`${theme} ${fg}/${bg}: ${contrast(c[fg], c[bg]).toFixed(2)}:1`);
+  }
+  }
 });
 
 test("legacy palette and radius compatibility remain stable", () => {
@@ -75,6 +79,7 @@ test("Tailwind emits variables, semantic utilities, opacity and unchanged legacy
   };
   assert.equal(declarations(":root")["--rt-color-surface"], "255 255 255");
   assert.equal(declarations(":root")["--radius"], "12px");
+  assert.equal(declarations(':root[data-theme="dark"]')["--rt-color-background"], "24 24 27");
   assert.equal(declarations(".bg-surface\\/50")["background-color"], "rgb(var(--rt-color-surface) / 0.5)");
   assert.match(declarations(".text-status-danger").color, /var\(--rt-color-status-danger\)/);
   assert.match(declarations(".border-border-strong")["border-color"], /var\(--rt-color-border-strong\)/);

@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:tokens": "node --test tests/tokens.test.cjs",
+    "test:theme": "node --test tests/theme.test.cjs",
+    "test:theme:preview": "npm run build && playwright test --config playwright.preview.config.ts",
     "lint": "eslint .",
     "test": "playwright test",
     "test:e2e": "playwright test",

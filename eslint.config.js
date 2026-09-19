@@ -19,9 +19,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
 
   {
-    files: ["design/tailwind-tokens.cjs", "tests/tokens.test.cjs"],
+    files: ["design/tailwind-tokens.cjs", "tests/tokens.test.cjs", "tests/theme.test.cjs"],
     languageOptions: { sourceType: "commonjs", globals: globals.node },
     rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+
+  {
+    files: ["public/theme-init.js"],
+    languageOptions: { sourceType: "script", globals: globals.browser },
   },
 
   // React (+ hooks + a11y) for TS/TSX

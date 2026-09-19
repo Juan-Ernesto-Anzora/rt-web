@@ -2,37 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import { getCurrentUserProfile } from "../auth/userProfile";
-
-type PreferenceState = {
-  theme: "system" | "light" | "dark";
-  density: "compact" | "comfortable";
-  emailNotifications: boolean;
-};
-
-const DEFAULT_PREFERENCES: PreferenceState = {
-  theme: "system",
-  density: "compact",
-  emailNotifications: true,
-};
-
-const STORAGE_KEY = "rt.profile.preferences";
-
-function readPreferences(): PreferenceState {
-  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return DEFAULT_PREFERENCES;
-    return { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) } as PreferenceState;
-  } catch {
-    return DEFAULT_PREFERENCES;
-  }
-}
-
-function writePreferences(preferences: PreferenceState) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-}
+import { useTheme, type Preferences as PreferenceState } from "../theme/ThemeProvider";
 
 function ProfileField({ label, value }: { label: string; value: string }) {
   return (
@@ -81,12 +51,13 @@ export default function ProfilePreferencesPage() {
   const navigate = useNavigate();
   const { token, tenant } = useAuth();
   const profile = getCurrentUserProfile(token);
-  const [preferences, setPreferences] = useState<PreferenceState>(DEFAULT_PREFERENCES);
+  const { preferences: appliedPreferences, updatePreferences, persistenceError } = useTheme();
+  const [preferences, setPreferences] = useState<PreferenceState>(appliedPreferences);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setPreferences(readPreferences());
-  }, []);
+    setPreferences(appliedPreferences);
+  }, [appliedPreferences]);
 
   function updatePreference<K extends keyof PreferenceState>(key: K, value: PreferenceState[K]) {
     setPreferences((current) => ({ ...current, [key]: value }));
@@ -95,8 +66,11 @@ export default function ProfilePreferencesPage() {
 
   function submitPreferences(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    writePreferences(preferences);
-    setSaved(true);
+    const patch: Partial<PreferenceState> = {};
+    if (preferences.theme !== appliedPreferences.theme) patch.theme = preferences.theme;
+    if (preferences.density !== appliedPreferences.density) patch.density = preferences.density;
+    if (preferences.emailNotifications !== appliedPreferences.emailNotifications) patch.emailNotifications = preferences.emailNotifications;
+    setSaved(updatePreferences(patch));
   }
 
   return (
@@ -177,6 +151,7 @@ export default function ProfilePreferencesPage() {
               Email notifications
             </label>
 
+            {persistenceError && <div role="alert" className="rounded-medium bg-status-danger-surface px-3 py-2 text-sm text-status-danger">{persistenceError}</div>}
             {saved && (
               <div className="rounded-lg border border-primary-600 bg-primary-50 px-3 py-2 text-sm font-semibold text-primary-700">
                 Preferences saved.

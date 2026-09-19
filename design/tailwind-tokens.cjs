@@ -15,10 +15,17 @@ function resolveColor(value) {
 const resolvedColors = Object.fromEntries(
   Object.entries(tokens.color).map(([name, value]) => [name, resolveColor(value)]),
 );
-const variables = Object.fromEntries(Object.entries(resolvedColors).map(([name, hex]) => [
+const resolvedDarkColors = Object.fromEntries(
+  Object.entries(tokens.darkColor).map(([name, value]) => [name, resolveColor(value)]),
+);
+if (Object.keys(resolvedColors).sort().join() !== Object.keys(resolvedDarkColors).sort().join()) {
+  throw new Error("Light and dark token roles must match");
+}
+const colorVariables = (colors) => Object.fromEntries(Object.entries(colors).map(([name, hex]) => [
   `--rt-color-${name}`,
   hex.slice(1).match(/../g).map((channel) => parseInt(channel, 16)).join(" "),
 ]));
+const variables = colorVariables(resolvedColors);
 for (const [name, value] of Object.entries(tokens.radius)) {
   if (!/^\d+px$/.test(value)) throw new Error(`Invalid radius token: ${name}`);
   variables[`--rt-radius-${name}`] = value;
@@ -26,6 +33,7 @@ for (const [name, value] of Object.entries(tokens.radius)) {
 
 module.exports = {
   resolvedColors,
+  resolvedDarkColors,
   resolveColor,
   colors: {
     ...tokens.brand.colors,
@@ -41,5 +49,6 @@ module.exports = {
   },
   plugin: plugin(({ addBase }) => {
     addBase({ ":root": { ...variables, "--radius": tokens.radius.large } });
+    addBase({ ':root[data-theme="dark"]': colorVariables(resolvedDarkColors) });
   }),
 };

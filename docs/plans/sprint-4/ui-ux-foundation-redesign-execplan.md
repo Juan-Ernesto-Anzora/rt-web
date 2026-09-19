@@ -1,5 +1,45 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active implementation: M2 theme runtime
+
+### Final production closeout
+
+Status: **PASS for local M2 build and production-preview verification**. This evidence supersedes earlier test counts below. No M3 or production-runtime changes were made during closeout; only permanent verification, narrow CI invocation and evidence documentation were extended.
+
+- Build: `npm.cmd run test:theme:preview` runs the production build before a new preview server. Generated `dist/index.html` references `/theme-init.js` in a classic blocking head script before `/assets/index-DgRWUgR_.js`; `dist/theme-init.js` matches the source exactly (SHA-256 `d61c09436ece5f8fa021e3fdaf2e6b0bec85919fc423ab91a806df531bcfd764`). 140 modules build successfully.
+- Browser proof: saved dark, system/dark OS and system/light OS each resolve the HTML attribute and color-scheme with React's hashed entry held and `#root` empty. After releasing the entry, Login renders. Preview tests also verify preference Save/reload/System changes and semantic-consumer colors. Five preview tests pass in 7.6s; the full normal environment passes twelve tests in 21.2s (seven functional plus five theme).
+- Delivery: preview serves the actual bootstrap as 200 JavaScript with `Cache-Control: no-cache`. Current Vite/router/README are root-oriented, with no custom base/basename or documented subpath deployment. Non-root app deployment is not supported/proven merely by the BASE_URL placeholder. No deployed server/CDN/CSP configuration was established from this checkout.
+- External asset assessment: stable URL risks stale cache or unavailable script if a host applies immutable caching, blocks scripts, omits public files or returns SPA HTML. Require script/HTML revalidation, same-origin CSP permission and atomic complete dist deployment. Without the script, ThemeProvider dereferences an absent runtime before the inner error boundary; blank startup is possible. Documented as an asset-delivery prerequisite, not silently masked by another resolver. The tested production model serves it correctly; no runtime architecture defect was demonstrated.
+- Consistency: ThemeProvider is a typed subscriber to the exact head-script store, not another validator/resolver. Accepted values, system fallback, effective computation, root attribute and color-scheme share one implementation. Token palette still exists only in JSON.
+- Lifecycle/storage: ten runtime tests pass, including explicit light and dark precedence, shared subscriber ownership, final-listener cleanup/remount, zero writes during storage events, immediate same-tab state, malformed/inaccessible storage, failed-write session behavior and preservation of unrelated fields.
+- Permanent gate: typecheck, lint, build, four token tests, ten runtime tests, twelve normal E2E tests, five production-preview theme tests and git diff --check pass. Established npm equivalents used; prior pnpm launcher limitation remains documented without machine repair. Hosted CI has NOT run for this diff. Browserslist age/terminal color warnings remain non-blocking.
+
+Closeout changes only: `playwright.preview.config.ts`, `package.json` (test:theme:preview), `tests/e2e/theme-runtime.spec.ts` (production-compatible first-paint tests), `tests/theme.test.cjs` (lifecycle/zero-write assertions), `.github/workflows/ci-web.yml` (preview step reusing its build), `docs/design/03-design-tokens.md`, and this ExecPlan. No production source, palette or preference behavior changed in this review. No temporary harness or tracked screenshot artifacts.
+
+M3 starting point remains shared accessible native primitives consuming the verified semantic tokens/runtime, with Light/Dark keyboard/focus/error/contrast tests. No App Shell, page, route, RBAC, API, density or component-library work is authorized by this closeout.
+
+M1 is merged at `cc7db5e` (PR #23); branch `feat/theme-runtime` starts clean. The user now authorizes only M2. Earlier M1/audit scope statements remain historical. Normative Blueprint v1.1 R3 requires browser-local Light/Dark/System with the existing `rt.profile.preferences` object. Current missing/parse-error default is system; retain it and normalize invalid theme values to system as well.
+
+Architecture: one parser-blocking, same-origin `public/theme-init.js` script in the document head resolves/applies `html[data-theme=light|dark]` and color-scheme before the body/React module. It owns the small preference store; a typed React ThemeProvider subscribes through useSyncExternalStore. The bootstrap and React therefore use the same storage/resolution code, with no duplicated resolver or palette. Subscribe to OS and cross-tab storage events with cleanup. Profile's existing Save action commits only changed preference fields, merging unrelated stored fields; storage write failure is visible and does not claim persistence.
+
+Dark mappings belong solely in `design/design-tokens.json`; the M1 adapter emits a dark root selector with the same semantic aliases. Keep legacy utilities unchanged. Add permanent runtime tests using Node VM on the real bootstrap and Playwright tests for head initialization before the React module, preference UI, root switching and a bounded semantic test consumer. Update contrast checks for both themes. Required gate: npm typecheck/lint/build/test:e2e/test:tokens plus new test:theme and git diff --check. No M3 or broad consumer migration.
+
+- [x] M2 runtime, dark mappings and preference integration.
+- [x] Permanent behavior/first-paint/contrast tests and bounded visual evidence.
+- [x] Full local gate and M3 handoff.
+
+M2 result: **PASS locally**. Hosted CI has not run for this diff. `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` (140 modules), `npm.cmd run test:tokens` (four tests), `npm.cmd run test:theme` (nine tests), and CI-mode `npm.cmd run test:e2e` (ten Chromium tests, 18.1 seconds) pass. `git diff --check` passes. Used established npm equivalents because the desktop pnpm launcher issue is already documented; no machine/dependency repair attempted. The first focused browser run could not execute when automatic approval review hit usage limits; the user resumed and the approved rerun completed. A hidden-radio test interaction was corrected to visible-label/keyboard operation; final tests pass without forced clicks.
+
+First-paint evidence: the browser test blocks the React module and confirms saved Dark is already on the HTML root with color-scheme=dark and an empty React root. The production build retains the blocking head script ahead of its module and copies public/theme-init.js byte-for-byte. This proves root initialization, not complete dark rendering of legacy pages. Bounded light/dark semantic screenshots in `.agent/tmp/m2-theme/` were visually inspected; both are generated by the permanent test and remain ignored artifacts.
+
+Contrast evidence (light/dark): foreground/background 17.06/16.12; muted/background 7.24/11.99; primary-action label/fill 6.29/6.29; info 7.09/8.32; success 7.29/9.94; warning 6.84/10.39; danger 5.72/8.27, all ratios to 1. Token tests enforce >=4.5 normal text plus >=3 focus/strong-border pairs. Full values and intended surfaces are in `docs/design/03-design-tokens.md`.
+
+M2 files: `public/theme-init.js`, `src/theme/ThemeProvider.tsx`, `index.html`, `src/main.tsx`, `src/pages/ProfilePreferencesPage.tsx`, `design/design-tokens.json`, `design/tailwind-tokens.cjs`, `tests/theme.test.cjs`, `tests/tokens.test.cjs`, `tests/e2e/theme-runtime.spec.ts`, `package.json`, `eslint.config.js`, `.github/workflows/ci-web.yml`, `docs/design/03-design-tokens.md`, and this plan. No dependency/lockfile, route, RBAC, API, fan-out or redesigned page changes.
+
+Remaining limits: legacy white/neutral utilities, body background, cards/buttons and native controls are not a complete dark UI; root color-scheme changes native browser controls. No full-page dark baselines or hosted/deployed sign-off. Public theme-init.js must be served alongside built assets and allowed by deployment CSP; verify deployment cache policy for this non-fingerprinted public asset. Existing Browserslist age warning remains non-blocking. Storage denial is recoverable/session-only and reports persistence failure.
+
+Exact M3 handoff: implement only shared accessible primitive foundations (native wrappers where sufficient): buttons/fields/input/select/textarea/check/radio/dialog and state components as demanded by existing consumers, with semantic tokens and useTheme where needed. Preserve native dialog/focus/required/error semantics and legacy compatibility adapters, add light/dark keyboard/contrast tests. Do not implement App Shell/navigation, page redesigns, density, APIs/RBAC changes or a new component library without a separately justified need. M3 is planned, not started.
+
 ## Active implementation: 2026-09-19 M1
 
 ### M1 closeout review
@@ -163,7 +203,7 @@ Audit: inspect source and existing tests; validate document references and `git 
 - [x] Capture 18 representative mocked light-route images; inspect Home and mobile Detail. Exhaustive route/state visual evidence remains partial.
 - [x] Verify references, scope, and report remaining evidence gaps.
 - [x] M1 semantic tokens: JSON/adapter, compatibility, contrast tests, visual parity and full package-script gate completed 2026-09-19.
-- [ ] M2 theme architecture (future implementation).
+- [x] M2 theme runtime complete; see current M2 result above. Historical milestone numbering below is superseded by Blueprint v1.1.
 - [ ] M3 shared primitives (future implementation).
 - [ ] M4 domain components (future implementation).
 - [ ] M5 App Shell (future implementation).
@@ -173,6 +213,12 @@ Audit: inspect source and existing tests; validate document references and `git 
 - [ ] M9 visual regression baseline (future implementation).
 
 ## Surprises & Discoveries
+
+- M2 production closeout: the previous first-paint test held only /src/main.tsx, so it could not demonstrate production initialization. It now matches the hashed production entry too and verifies the entry was actually held before inspecting pre-React state. Both dev and preview report no-cache for the bootstrap; deployed-host headers remain unknown.
+
+- M2: Profile's prior default was already system, but unvalidated persisted values could leak into UI state and write errors could throw. Shared normalization retains system fallback; blocked writes now remain session-only and preserve that session state across later changes.
+- M2: Classic head-script bootstrap avoids a second inlined resolver. React subscribes to the very same store; storage and OS listeners are removed after the final unsubscribe and restored on mount, including StrictMode remounts.
+- M2: The existing radio inputs are visually hidden behind labels. Browser verification uses the real label and keyboard rather than changing the page or forcing pointer events.
 
 - M1 closeout: `.agent/tmp/` was untracked but not ignored; the targeted ignore rule now prevents accidental inclusion of screenshot evidence. Parallel lint/E2E directory scanning caused a transient ENOENT; sequential lint passes.
 
@@ -189,6 +235,12 @@ Audit: inspect source and existing tests; validate document references and `git 
 
 ## Decision Log
 
+- M2 production closeout: retain the external bootstrap after successful built-output/browser proof. Document its deployment/cache/failure contract; add permanent preview verification using current tools and CI build, rather than rewriting a working architecture. No M3 work.
+
+- M2: Preserve Save Preferences semantics: radio selection is draft until Save. Merge only changed fields with latest stored fields, including unknown fields; do not introduce a second theme key or activate density/email behavior.
+- M2: Keep dark palette values exclusively in JSON, enforce matching role sets, and generate the sole activation selector :root[data-theme="dark"]. Root color-scheme expresses the same effective theme for native controls.
+- M2: Reuse built-in Node VM tests for the actual classic bootstrap and existing Playwright for reliable pre-React/browser verification; add no dependencies. Record only isolated semantic-consumer dark screenshots until page migration.
+
 - M1 closeout: keep the adapter, four permanent token tests and all narrowly scoped tooling changes; no duplicated production token values or temporary-only tooling found. Update only artifact exclusion and closeout evidence. M2 remains unauthorized.
 
 - 2026-09-19: Blueprint v1.1 and the user's M1 request govern over historical audit-only scope and old milestone numbering. Continue on the existing `feat/ui-ux-foundation` branch and preserve user-provided untracked design documents.
@@ -201,6 +253,8 @@ Audit: inspect source and existing tests; validate document references and `git 
 - 2026-09-18: M1 is additive and compatibility-preserving; accessibility and screenshot evidence start before consumers migrate, even though their cross-cutting completion gates are M7 and M9.
 
 ## Outcomes & Retrospective
+
+Current outcome: M2 is complete and verified locally, as recorded at the top of this plan. M1/audit outcomes below are historical. Theme behavior is usable through the existing preference page while broad legacy visual migration remains deferred to later milestones. Next is M3 shared primitives, not App Shell or page redesign.
 
 M1 outcome (2026-09-19): additive token foundation complete. Exact pnpm typecheck/lint/build/test:e2e commands hit the known pre-script launcher block; npm run typecheck, lint, build and test:e2e all pass (139 modules, seven mocked Chromium tests in 20.2s). npm run test:tokens passes four tests, including emitted CSS and opacity. git diff --check passes. Existing representative baseline inspected; four fresh before/after PNG pairs are identical. No visual migration, dark runtime, density activation or business behavior change. Changes are the nine M1 files listed above plus this plan; user Blueprint/inventory files are preserved. No commit or PR requested.
 
