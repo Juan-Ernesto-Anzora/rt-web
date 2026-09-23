@@ -1,5 +1,30 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active implementation: M3 shared accessible primitives
+
+M1/M2 are merged; clean baseline `b70435f` on `feat/shared-ui-primitives`. This request authorizes M3 only. Build a small `src/components/ui/` layer (Button/IconButton, Field/native controls, Badge, Skeleton, Dialog, PageHeader, Separator); refine existing common feedback components and retain their exports. Keep StatusBadge category/name behavior and a PriorityChip adapter to the new PriorityIndicator. Native AdminDialog becomes a compatibility export; ConfirmDialog uses Button and preserves callbacks with busy dismissal protection. No product page JSX or router changes.
+
+Evidence: repeated secondary/danger buttons and form classes across Create/Admin; field association logic local to Create; shared state components currently hard-code light palette; native AdminDialog already contains modality/focus behavior worth preserving. PageHeader and Separator cover repeated heading/actions and horizontal boundaries. Radio/tabs/menu/drawer/avatar/combobox frameworks are excluded. Keep PaginationControls, KpiCard, page-specific inputs/headers and legacy CSS for later migrations.
+
+Verification surface: permanent `tests/fixtures/primitives.html` and TSX fixture, opened directly by Playwright in development only (not a router route or production build entry). Typecheck it, retain functional smoke and M2 preview tests, add keyboard/field/dialog/state tests and four preference/effective-theme cases. Capture only fixture light/dark images. Use existing React, native controls and Playwright; no new dependency or density runtime. Add focused token-pair checks for feedback/focus if needed.
+
+- [x] Shared primitives and compatibility refinements.
+- [x] Permanent accessibility/theme fixture and behavior tests (ten focused Chromium tests).
+- [x] Component API/migration documentation and local gate.
+- [x] Scope review and exact M4 handoff (App Shell/navigation only after separate authorization).
+
+M3 outcome: **PASS locally**, hosted CI not run. New primitives: Button/IconButton, Field/Input/Textarea/Select/Checkbox, Badge, Skeleton, Dialog, PageHeader, Separator and PriorityIndicator. Refined common notices/empty/error/loading and compatibility exports for StateBadge, PriorityChip and AdminDialog. StatusBadge logic is retained unchanged. No product page JSX migrated; bounded integrations are ConfirmDialog -> Button/Dialog, ErrorState -> Button and LoadingRows -> Skeleton. Existing consumers keep their import paths/props/callbacks; visual styling of shared components is intentionally semantic now. ConfirmDialog busy Escape is intentionally protected, while parent-driven close remains allowed.
+
+Permanent coverage: typechecked `tests/fixtures/primitives.html`/TSX, no production route or build entry; `tests/e2e/primitives.spec.ts` with ten cases covering native activation/type/disabled/loading, named icon and target, required/label/help/error fields and native select/checkbox, modal Escape/button close/focus restoration/background inertness/busy state, initially-open StrictMode focus, feedback semantics/static loading, and Light/Dark/System-Light/System-Dark. `tests/tokens.test.cjs` also checks new focus/danger-surface and hover-text pairings. Fixture screenshots `.agent/tmp/m3-primitives/light.png` and `dark.png` were inspected, remain ignored, and do not certify legacy product screens.
+
+Final checks: npm.cmd run typecheck and lint pass; npm.cmd run build passes (146 modules); test:tokens four pass; test:theme ten pass; focused test:primitives originally nine pass, then extended to ten and all ten pass within the final full E2E run; `CI=true npm.cmd run test:e2e -- --retries=0` passes all 22 in 31.8s; `npm.cmd run test:theme:preview -- --retries=0` rebuilds and passes five production-preview tests in 7.7s; git diff --check and CI YAML validation pass. Established npm invocation used due documented pnpm launcher limitation; no machine/dependency repair. An earlier full run had a transient Chromium ERR_NETWORK_CHANGED navigation that passed on retry; the final no-retry run is clean. One approval-review invocation was not executed during a usage-limit interruption, then completed after the user resumed. Existing Browserslist/terminal-color warnings remain non-blocking.
+
+Final scope/files: new `src/components/ui/{Button,Field,Controls,Badge,Skeleton,Dialog,PageHeader,Separator}.tsx`, `ui/styles.ts`, `requests/PriorityIndicator.tsx`; modified `admin/AdminDialog.tsx`, `common/{EmptyState,ErrorState,InlineNotice,LoadingRows,StateBadge}.tsx`, `requests/PriorityChip.tsx`; permanent fixture/spec, token tests, package script, TypeScript fixture include, CI fixture trigger; `docs/design/04-component-system.md` and this plan. No diff in src/pages, main/router, auth, API/features, theme runtime, tokens JSON, lockfile or dependencies. Fixture absent from dist/tests/fixtures and no fixture title/code in built JS. No commit/push requested.
+
+Remaining limitations: Chromium-only behavior evidence; no universal WCAG/screen-reader certification. Native dialogs require modern showModal support and allow browser-chrome focus; no custom nested-modal system. Legacy raw controls inside existing Admin dialogs and other pages can retain light-only styling; new shell tokens do not certify their descendants. Use semantic parents for transparent/Field primitives. KpiCard, PaginationControls, SystemStatusPage, Create TextInput/FieldError, Profile fields, page-local headers/buttons and legacy CSS remain pending consumer migration. Static Skeleton has no motion to disable. No new overlays, icon packages, custom selectors or density runtime.
+
+Exact M4 handoff: separately authorize App Shell + navigation per Blueprint v1.1 using these primitives. Inventory current destinations and guard ownership, unify persistent presentation/global search/create/user actions while preserving paths, server permission checks, back-state, My Requests/Recently Updated and Admin workflow/role context. Define accessible responsive navigation and route focus, and test deep links/refresh/denial/unsaved settings. Do not use M4 to redesign Dashboard/Search/Detail/Create/Admin content, add speculative routes/metrics, optimize API fan-out or activate density. M4 is planned, not implemented.
+
 ## Active implementation: M2 theme runtime
 
 ### Final production closeout
@@ -204,7 +229,7 @@ Audit: inspect source and existing tests; validate document references and `git 
 - [x] Verify references, scope, and report remaining evidence gaps.
 - [x] M1 semantic tokens: JSON/adapter, compatibility, contrast tests, visual parity and full package-script gate completed 2026-09-19.
 - [x] M2 theme runtime complete; see current M2 result above. Historical milestone numbering below is superseded by Blueprint v1.1.
-- [ ] M3 shared primitives (future implementation).
+- [x] M3 shared primitives complete; see current M3 evidence above.
 - [ ] M4 domain components (future implementation).
 - [ ] M5 App Shell (future implementation).
 - [ ] M6 navigation (future implementation).
@@ -213,6 +238,12 @@ Audit: inspect source and existing tests; validate document references and `git 
 - [ ] M9 visual regression baseline (future implementation).
 
 ## Surprises & Discoveries
+
+- M3: Initially-open dialogs under StrictMode can lose a scheduled explicit focus request during effect cleanup. Dialog now schedules contained initialFocusRef placement for each open effect, even if the native modal is already open; a permanent initial-open regression passes.
+
+- M3: Native Chromium dialogs can expose browser chrome at Tab boundaries. The corrected permanent test verifies inert background controls, dialog focus, Escape/button close and restoration rather than imposing an inaccurate custom focus-loop assumption. No new dialog library is needed.
+- M3: Existing AdminDialog's manual first-element focus could override native autofocus. Shared Dialog retains native initial focus and only applies a caller-provided contained initialFocusRef. ConfirmDialog preserves safe Cancel-first focus and now blocks Escape while busy.
+- M3: Four-token/ten-theme unit checks and the production build pass. The fixture is absent from dist/tests/fixtures, and no product-page/router file has changed. The synthetic fixture screenshots are not product-page dark baselines.
 
 - M2 production closeout: the previous first-paint test held only /src/main.tsx, so it could not demonstrate production initialization. It now matches the hashed production entry too and verifies the entry was actually held before inspecting pre-React state. Both dev and preview report no-cache for the bootstrap; deployed-host headers remain unknown.
 
@@ -235,6 +266,10 @@ Audit: inspect source and existing tests; validate document references and `git 
 
 ## Decision Log
 
+- M3: Keep common component locations as stable consumer APIs. StateBadge/PriorityChip/AdminDialog use compatibility exports; ConfirmDialog and ErrorState use Button, LoadingRows uses Skeleton. All page JSX, KpiCard, PaginationControls and page-local controls/headers remain unchanged.
+- M3: Use native Field-integrated controls and static Skeletons. Field owns ID/label/help/error relationships; one control per Field. No custom selection system, animation, icon/primitive framework or density behavior.
+- M3: Add tests/fixtures to existing TypeScript coverage and CI fixture path triggers. test:primitives selects the permanent Playwright suite, also discovered by full functional E2E. No new runner/dependency.
+
 - M2 production closeout: retain the external bootstrap after successful built-output/browser proof. Document its deployment/cache/failure contract; add permanent preview verification using current tools and CI build, rather than rewriting a working architecture. No M3 work.
 
 - M2: Preserve Save Preferences semantics: radio selection is draft until Save. Merge only changed fields with latest stored fields, including unknown fields; do not introduce a second theme key or activate density/email behavior.
@@ -253,6 +288,8 @@ Audit: inspect source and existing tests; validate document references and `git 
 - 2026-09-18: M1 is additive and compatibility-preserving; accessibility and screenshot evidence start before consumers migrate, even though their cross-cutting completion gates are M7 and M9.
 
 ## Outcomes & Retrospective
+
+Current outcome: M3 shared accessible primitives are implemented and verified locally, with compatibility exports and no page redesign. Ten primitive cases pass within a clean 22-test E2E run; production theme preview stays green. See the active M3 section and component guide for APIs, limits, scope and the exact M4 handoff. Older milestone outcomes below are historical.
 
 Current outcome: M2 is complete and verified locally, as recorded at the top of this plan. M1/audit outcomes below are historical. Theme behavior is usable through the existing preference page while broad legacy visual migration remains deferred to later milestones. Next is M3 shared primitives, not App Shell or page redesign.
 

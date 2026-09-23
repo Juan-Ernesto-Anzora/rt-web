@@ -1,0 +1,2 @@
+export const focusStyle = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring";
+export const controlStyle = `w-full rounded-small border border-border-strong bg-surface px-3 py-2 text-sm text-foreground placeholder:text-text-muted disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:text-text-muted aria-[invalid=true]:border-status-danger ${focusStyle}`;

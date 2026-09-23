@@ -1,16 +1,8 @@
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div role="alert" aria-live="assertive" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm">
-      <div className="font-semibold text-danger-500">{message}</div>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-lg border border-neutral-300 px-3 py-2 font-semibold text-neutral-700 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600"
-        >
-          Refresh
-        </button>
-      )}
-    </div>
-  );
+import { Button } from "../ui/Button";
+
+export function ErrorState({ message, onRetry, retryLabel = "Refresh" }: { message: string; onRetry?: () => void; retryLabel?: string }) {
+  return <div role="alert" aria-live="assertive" className="flex flex-wrap items-center justify-between gap-3 rounded-medium border border-status-danger bg-status-danger-surface px-4 py-3 text-sm">
+    <div className="font-semibold text-status-danger">{message}</div>
+    {onRetry ? <Button variant="secondary" size="sm" onClick={onRetry}>{retryLabel}</Button> : null}
+  </div>;
 }
