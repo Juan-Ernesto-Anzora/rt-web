@@ -1,5 +1,34 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active investigation: M5A Dashboard UX and data-contract audit
+
+M1-M4 are reported merged; this Web checkout is clean at branch `feat/dashboard-foundation`, based on `3a0fc90`. M5 is split into **M5A specification (this task), M5B API list-contract work in rt-api, and M5C Web Dashboard implementation**. The active deliverables are `docs/design/06-dashboard.md` and `docs/plans/sprint-4/m5-dashboard-data-contract.md`; they are self-contained and normative Blueprint v1.1 remains unchanged. This milestone authorizes documentation only.
+
+Progress:
+
+- [x] Read instructions, Blueprint, inventory, tokens/primitives/AppShell docs and this ExecPlan.
+- [x] Inspect Home, its shared components, types/normalizers, Detail enrichment, four queues, filters, status/priority, tests and shell integration.
+- [x] Read-only inspect sibling API serializers/views/pagination/tests for exact current list and summary contracts; no sibling files edited. Sibling checkout HEAD `906ee21cf165abdab0a07cb92ad28cee85e1a335`; deployed API state unverified.
+- [x] Create M5A UX specification and focused M5B/M5C contract/acceptance handoff.
+- [x] Validate 30 existing local/sibling file paths, endpoint/query references, documentation scope and git diff --check; record outcome.
+
+Surprises & Discoveries:
+
+- The checked-out API RequestViewSet serializes lists with flat RequestSerializer fields; nested status/flow/requester/assignee are present only on retrieve/detail. The list queryset already select_related all four relationships, making additive read-only list summaries feasible without one ORM read per row.
+- The Web sends `mine`, `requested_by_me`, `closed`, `priority`, `assignee` and `sort`, but this API view has no filter/order implementation for those params or global filter backend. The apparent `sort=-updated_at` result comes from default queryset order. This invalidates any claim that current queue tabs/quick filters reliably select different server records.
+- Current Web enriches eight fields from Detail even though priority/due_at/updated_at already exist on the list and flow/due_at are not displayed by Home. For N valid visible rows, the HTTP model is summary + list + N Detail.
+- Open/In Progress are tenant-wide category counts; Due Today/Overdue are tenant-wide active counts using API process local date. Their exact subsets cannot be opened with current list filters; new KPI clicks would be misleading.
+
+Decision Log:
+
+- Recommend additive nested labels and validated list filters on existing GET `/api/requests/`, retaining flat IDs and the DRF paginated envelope; prefer the already select_related queryset over new Dashboard-specific rows, aggregate bundling or client metadata joins.
+- Specify current quick-filter/tab effects precisely, including My Open's mine override and Recently Updated's no-op filter. M5C must make the effective queue visible; M5A does not silently relabel or change behavior.
+- Keep Search's analogous detail fan-out in M6. No API/serializer/Web runtime edits, SQL work, route additions or fake KPI filters belong to M5A.
+
+Outcomes & Retrospective:
+
+M5A specifications are complete, with the exact current data/request model, backward-compatible M5B API acceptance and M5C Dashboard visual/interaction/URL/accessible states. M5B first validates current API main/OpenAPI and adds list nested summaries plus tenant-scoped filters/sort with negative tests; M5C then removes row-detail HTTP fan-out and implements the approved Home hierarchy under M4 AppShell. Target Dashboard data calls are 2 initial, 1 per queue/filter/page, 2 refresh, and 0 row Detail; Admin permission context is accounted separately. Verification: 30 existing Web/sibling file paths resolved; new docs have no trailing whitespace; `git diff --check` passes; only these two new docs and this plan changed. No app test suite or live API was run for this documentation-only audit. M5B/M5C are not started.
+
 ## Active implementation: M4 App Shell and navigation
 
 M1-M3 are merged; current branch `feat/app-shell-navigation` starts clean. Blueprint v1.1 and the attached M4 request govern this milestone. Add one authenticated `AppShell` layout route under existing Protected, keep AdminProtected for `/admin/*`, and move common navigation from App/AdminShell into the layout. Preserve every public URL, page loader/mutation, and Settings `useBlocker`. Home/Search stay separate route elements. Initial breakpoint candidate: Tailwind `lg` (1024px), because current 240px Admin rail plus wide tables compress the 768px workspace; verify at 320/768/1024/1440 before retaining it.
