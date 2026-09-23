@@ -6,8 +6,10 @@ import { useAdminPermission } from "./auth/adminPermissions";
 import { AuthProvider, useAuth } from "./auth/useAuth";
 import { ErrorState } from "./components/common/ErrorState";
 import { AppErrorBoundary } from "./components/common/AppErrorBoundary";
+import AppShell from "./components/layout/AppShell";
 import "./index.css";
 import App from "./pages/App";
+import SearchView from "./pages/SearchView";
 import AdminShellPage from "./pages/admin/AdminShellPage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import Login from "./pages/Login";
@@ -34,15 +36,15 @@ function AdminProtected({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-50 p-6">
-        <div className="card p-5 text-sm font-semibold text-neutral-700">Checking admin permissions...</div>
+      <div className="p-6" role="status" aria-live="polite">
+        <div className="text-sm font-semibold text-text-muted">Checking admin permissions...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-neutral-50 p-6">
+      <div className="p-6">
         <ErrorState message={error} onRetry={() => window.location.reload()} />
       </div>
     );
@@ -62,60 +64,16 @@ const router = createBrowserRouter([{
   children: [
   { path: "login", element: <Login /> },
   {
-    path: "search",
-    element: (
-      <Protected>
-        <App initialView="search" />
-      </Protected>
-    ),
-  },
-  {
-    path: "requests/new",
-    element: (
-      <Protected>
-        <RequestCreatePage />
-      </Protected>
-    ),
-  },
-  {
-    path: "requests/:id",
-    element: (
-      <Protected>
-        <RequestDetailPage />
-      </Protected>
-    ),
-  },
-  {
-    path: "profile/preferences",
-    element: (
-      <Protected>
-        <ProfilePreferencesPage />
-      </Protected>
-    ),
-  },
-  {
-    path: "403",
-    element: (
-      <Protected>
-        <ForbiddenPage />
-      </Protected>
-    ),
-  },
-  {
-    path: "admin/*",
-    element: (
-      <AdminProtected>
-        <AdminShellPage />
-      </AdminProtected>
-    ),
-  },
-  {
-    index: true,
-    element: (
-      <Protected>
-        <App />
-      </Protected>
-    ),
+    element: <Protected><AppShell /></Protected>,
+    children: [
+      { index: true, element: <App /> },
+      { path: "search", element: <SearchView /> },
+      { path: "requests/new", element: <RequestCreatePage /> },
+      { path: "requests/:id", element: <RequestDetailPage /> },
+      { path: "profile/preferences", element: <ProfilePreferencesPage /> },
+      { path: "403", element: <ForbiddenPage /> },
+      { path: "admin/*", element: <AdminProtected><AdminShellPage /></AdminProtected> },
+    ],
   },
   { path: "*", element: <NotFoundPage /> },
   ],

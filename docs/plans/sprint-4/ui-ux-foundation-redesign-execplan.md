@@ -1,5 +1,34 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active implementation: M4 App Shell and navigation
+
+M1-M3 are merged; current branch `feat/app-shell-navigation` starts clean. Blueprint v1.1 and the attached M4 request govern this milestone. Add one authenticated `AppShell` layout route under existing Protected, keep AdminProtected for `/admin/*`, and move common navigation from App/AdminShell into the layout. Preserve every public URL, page loader/mutation, and Settings `useBlocker`. Home/Search stay separate route elements. Initial breakpoint candidate: Tailwind `lg` (1024px), because current 240px Admin rail plus wide tables compress the 768px workspace; verify at 320/768/1024/1440 before retaining it.
+
+Architecture: AppShell owns global utility bar, NavLink groups, compact Dialog navigation, SkipLink, a single main landmark, route focus and user disclosure. AdminShell retains section composition and contextual heading, loses its redundant full sidebar; a shared static `adminSections` map drives both Admin page selection and shell visibility. The shell reads existing tenant-scoped `useAdminPermission`; AdminProtected and page gates remain unchanged. Expect one added permission GET when entering previously shell-less authenticated routes, no cache/API refactor; measure via browser tests. Route focus runs only on pathname changes and targets the first page heading or main fallback after overlays close.
+
+Scope: minimal conversion of legacy nested main tags to div and outer page min-height wrappers to fit one shell. Preserve page-specific titles/Back/actions, visual content and business state. Existing 403/404/error behavior remains. Responsive panel uses M3 native Dialog. User actions use ordinary links/buttons without ARIA menu roles. Use semantic tokens only in new shell components. No page/queue/filter/API redesign.
+
+- [x] Route and navigation composition, guards, responsive/user interactions.
+- [x] Permanent route, keyboard, dirty Settings, permission and responsive tests.
+- [x] Light/Dark visual evidence and documented shell decisions.
+- [x] Full local gate and M5 handoff.
+
+M4 local outcome: **PASS**; hosted CI has not run for this branch. `npm.cmd run typecheck` and `npm.cmd run lint` pass; `npm.cmd run build` transforms 149 modules; token/theme tests pass (4/10); final CI-mode `npm.cmd run test:e2e -- --retries=0` passes all 34 in 46.6s (12 new shell, 7 existing Sprint 3, 10 M3 primitives and 5 M2 theme); `npm.cmd run test:theme:preview -- --retries=0` rebuilds and passes 5 production-theme tests in 8.0s; `git diff --check` passes. The final run includes the two-row 320px header and tests the strong active-route border color on both themes. Used the established npm equivalents because the desktop pnpm launcher issue is already documented. All browser API data is intercepted; no live API/SQL sign-off is inferred.
+
+Shell architecture and routes: `src/main.tsx` adds a Protected parent route with `AppShell` and preserves all public child paths; AdminProtected still wraps `/admin/*`. `src/pages/App.tsx` is now a HomePage export; `src/pages/SearchView.tsx` contains the former Search markup/logic. `src/navigation/adminSections.ts` shares Admin mapping between the shell links and AdminShellPage. The old Admin full sidebar was removed while its contextual heading and section content remain. Page-specific nested `main` tags became div to retain one main landmark. The old global Home/New Request duplicate button was removed from Home; the globally available link performs the same navigation. `legacy-page` restores readable light canvases and native controls for content awaiting later page migrations, while the shell uses semantic Light/Dark tokens.
+
+Accessibility and behavior: SkipLink is first; NavLink exact-match aria-current and active border identify destination; user actions are a normal disclosure (expanded/controls, ordinary Tab sequence, Escape/trigger focus, outside click, Preferences, Sign out); compact Menu uses the native Dialog at the existing lg=1024 breakpoint. Route focus moves to first heading, falling back to the named main after async loading, and does not run on first page load or query-only changes. Direct paths, refresh, browser Back/Forward, Create/Detail/Profile, Admin guard and friendly 403/404 passed tests. M4 checked 320/768/1024/1440 widths with no horizontal document overflow on tested routes. The existing Settings useBlocker was exercised from a dirty form through shell Home navigation: Cancel retained edits and route; Leave page proceeded. No new authorization logic or permission cache was added.
+
+Measured permission effect: the mocked React StrictMode Home mount made 2 `/api/admin/me/permissions/` calls; client navigation to Create left the count at 2. Shell visibility on a fresh Create/Detail/Profile route adds one logical permission hook (which can mount twice in development); Home/Search replace their former App hook, while Admin replaces the former AdminShell hook. No backend endpoint, tenant header or list-detail fan-out logic changed.
+
+Visual evidence in ignored `.agent/tmp/m4-shell/`: Home 1440 Light, Admin 1440 Light, Detail 1024 Light, Search 1440 Dark, Search 768 Dark, Search 320 Light, compact Navigation 320 and Create 320 were inspected. Tests pin locale/timezone and fixtures and assert computed shell colors, active URL and overflow. Golden `toHaveScreenshot` baselines were deliberately deferred because the local Windows Chromium renderer and CI Ubuntu font rasterization are not pinned to one image environment; committing local snapshots would make CI flaky. These captures establish reviewable shell evidence, not a cross-platform image diff. Product content remains intentionally mixed light in Dark mode until its own milestone.
+
+Files changed for M4: `src/components/layout/AppShell.tsx`, `src/navigation/adminSections.ts`, `src/pages/{App,SearchView,HomePage,RequestCreatePage,RequestDetailPage,ProfilePreferencesPage,ForbiddenPage}.tsx`, `src/pages/admin/AdminShellPage.tsx`, `src/components/common/SystemStatusPage.tsx`, `src/index.css`, `src/main.tsx`, `tests/e2e/{app-shell,sprint3-admin-smoke}.spec.ts`, `docs/design/05-app-shell-navigation.md`, and this ExecPlan. No auth/API/feature module, design token JSON, dependency, density runtime or new route changed. `tests/e2e/app-shell.spec.ts` initially mocked Vite source modules under `/src/api/` due a broad `**/api/**` handler; it now continues all paths outside `/api/`. After that correction all focused and full tests pass. CI path filters already cover src, tests and plans; no workflow changes needed.
+
+Known limits: old page headers/cards/controls and Search/Home detail enrichment remain for M5+. Admin overview still carries a historical setup placeholder; M4 did not redesign Admin content. The role/permission list is still determined by existing API context and page/server checks. Root app errors/404 stay outside the authenticated shell as before. Full WCAG assessment, deployed API behavior and approved cross-platform visual snapshots remain future gates.
+
+Exact M5 handoff: redesign only Home/dashboard as an actionable workspace using this shell and M3 primitives. Preserve existing four queue tabs (My Tasks, Other Tasks, My Requests, Recently Updated), Quick Filters, current Open/In Progress/Due Today/Overdue KPI meanings, search entry, request_id navigation, server data, loading/empty/error states, auth/tenant headers and URL paths. Establish current populated/empty/error visual baseline, measure actual list/detail request counts and define a separate contract/performance acceptance step if fan-out needs change. Do not migrate Search results, Request Detail, Create or Admin page content in M5 without separately authorized scope.
+
 ## Active implementation: M3 shared accessible primitives
 
 M1/M2 are merged; clean baseline `b70435f` on `feat/shared-ui-primitives`. This request authorizes M3 only. Build a small `src/components/ui/` layer (Button/IconButton, Field/native controls, Badge, Skeleton, Dialog, PageHeader, Separator); refine existing common feedback components and retain their exports. Keep StatusBadge category/name behavior and a PriorityChip adapter to the new PriorityIndicator. Native AdminDialog becomes a compatibility export; ConfirmDialog uses Button and preserves callbacks with busy dismissal protection. No product page JSX or router changes.
@@ -220,6 +249,8 @@ Audit: inspect source and existing tests; validate document references and `git 
 
 ## Progress
 
+- [x] M4 App Shell/navigation complete and locally verified; see active M4 outcome above. M5 is not started.
+
 - [x] M1 closeout: source-of-truth, complete scope/tooling review, retained parity hashes, permanent suite rerun and temporary-artifact exclusion verified.
 
 - [x] Read repository instructions, Blueprint, tokens, and Sprint 3 verification/limitations.
@@ -238,6 +269,11 @@ Audit: inspect source and existing tests; validate document references and `git 
 - [ ] M9 visual regression baseline (future implementation).
 
 ## Surprises & Discoveries
+
+- M4: The first focused test fixture used `**/api/**` and accidentally intercepted Vite source modules under `/src/api/`, yielding blank pages. Filtering by actual path prefix `/api/` fixed the test without changing production modules.
+- M4: A semantic dark shell initially exposed unreadable legacy Search/Home headings on its dark canvas. `legacy-page` reuses the old neutral canvas and local light color-scheme for unmigrated descendants; the shell and new navigation remain semantic/dark. A class was briefly applied to nested DetailField/TextInput/ProfileField rather than roots during editing and was corrected before verification.
+- M4: The first 320px utility screenshot used three rows after adding initials/name to the user trigger. A two-row mobile grid now keeps the initials avatar in the first row and Search/New Request in the second; the full accessible user name remains on the trigger. Focus/overflow checks and the updated screenshot pass.
+- M4: Existing Admin Settings useBlocker works with shell NavLinks. React StrictMode made two initial mocked permission calls; no further call occurred when navigating to Create within the mounted shell.
 
 - M3: Initially-open dialogs under StrictMode can lose a scheduled explicit focus request during effect cleanup. Dialog now schedules contained initialFocusRef placement for each open effect, even if the native modal is already open; a permanent initial-open regression passes.
 
@@ -266,6 +302,10 @@ Audit: inspect source and existing tests; validate document references and `git 
 
 ## Decision Log
 
+- M4: Use `lg`=1024px for the persistent 224px rail, verified at neighboring 768 and wide 1440 viewports. Use a native dialog for compact navigation and a disclosure for user actions; no icon/menu framework or decorative motion.
+- M4: Share existing admin section metadata, retain AdminProtected and server authorization, and keep page data out of AppShell. Route change focus uses first heading/main after transient overlays close; query-only updates do not steal focus.
+- M4: Preserve unmigrated content readability with a scoped legacy light canvas/color-scheme, not a broad class migration. Capture deterministic visual evidence but defer committed snapshots until one cross-platform renderer/font environment is pinned.
+
 - M3: Keep common component locations as stable consumer APIs. StateBadge/PriorityChip/AdminDialog use compatibility exports; ConfirmDialog and ErrorState use Button, LoadingRows uses Skeleton. All page JSX, KpiCard, PaginationControls and page-local controls/headers remain unchanged.
 - M3: Use native Field-integrated controls and static Skeletons. Field owns ID/label/help/error relationships; one control per Field. No custom selection system, animation, icon/primitive framework or density behavior.
 - M3: Add tests/fixtures to existing TypeScript coverage and CI fixture path triggers. test:primitives selects the permanent Playwright suite, also discovered by full functional E2E. No new runner/dependency.
@@ -288,6 +328,8 @@ Audit: inspect source and existing tests; validate document references and `git 
 - 2026-09-18: M1 is additive and compatibility-preserving; accessibility and screenshot evidence start before consumers migrate, even though their cross-cutting completion gates are M7 and M9.
 
 ## Outcomes & Retrospective
+
+Current outcome: M4 App Shell/navigation is implemented and passes the full local gate. AppShell composes one authenticated main, global actions, desktop/compact navigation, accessible user disclosure, route focus and permission-aware Admin links. AdminShell retains section composition without a second sidebar. The existing Settings dirty navigation remains protected. Visual captures and API request counts are recorded above and in `docs/design/05-app-shell-navigation.md`. M5 Dashboard is the next separately authorized product-content milestone; M4 made no dashboard data or API optimization.
 
 Current outcome: M3 shared accessible primitives are implemented and verified locally, with compatibility exports and no page redesign. Ten primitive cases pass within a clean 22-test E2E run; production theme preview stays green. See the active M3 section and component guide for APIs, limits, scope and the exact M4 handoff. Older milestone outcomes below are historical.
 
