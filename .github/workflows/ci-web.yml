@@ -17,6 +17,7 @@ on:
       - "vite.config.*"
       - "playwright.config.*"
       - "tests/e2e/**"
+      - "tests/fixtures/**"
       - "AGENTS.md"
       - ".agent/**"
       - ".codex/**"

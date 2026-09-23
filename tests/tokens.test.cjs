@@ -48,6 +48,9 @@ test("new text/status/action pairs meet AA and focus/strong borders meet non-tex
     assert.ok(contrast(c["focus-ring"], c[surface]) >= 3);
     assert.ok(contrast(c["border-strong"], c[surface]) >= 3);
   }
+  // M3 danger controls and feedback actions use these paired surfaces.
+  assert.ok(contrast(c["focus-ring"], c["status-danger-surface"]) >= 3);
+  assert.ok(contrast(c["foreground"], c["surface-hover"]) >= 4.5);
   for (const [fg, bg] of [["foreground", "background"], ["text-muted", "background"], ["action-primary-foreground", "action-primary"], ...["info", "success", "warning", "danger"].map(s => [`status-${s}`, `status-${s}-surface`])]) {
     console.log(`${theme} ${fg}/${bg}: ${contrast(c[fg], c[bg]).toFixed(2)}:1`);
   }
