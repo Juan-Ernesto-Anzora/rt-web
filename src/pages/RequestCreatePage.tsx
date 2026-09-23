@@ -278,7 +278,7 @@ export default function RequestCreatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="legacy-page">
       <header className="border-b border-neutral-200 bg-white px-6 py-4">
         <button
           type="button"
@@ -291,7 +291,7 @@ export default function RequestCreatePage() {
         <p className="mt-1 text-sm text-neutral-600">Create a request for intake, assignment, and follow-up.</p>
       </header>
 
-      <main className="mx-auto max-w-5xl p-6">
+      <div className="mx-auto max-w-5xl p-6">
         <form onSubmit={handleSubmit} className="card space-y-5 p-5">
           {formError && (
             <div className="rounded-lg border border-danger-500 bg-white px-4 py-3 text-sm font-semibold text-danger-500">
@@ -416,7 +416,7 @@ export default function RequestCreatePage() {
             </button>
           </div>
         </form>
-      </main>
+      </div>
     </div>
   );
 }

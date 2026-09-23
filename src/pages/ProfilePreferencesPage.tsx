@@ -74,7 +74,7 @@ export default function ProfilePreferencesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="legacy-page">
       <header className="border-b border-neutral-200 bg-white px-6 py-4">
         <button
           type="button"
@@ -94,10 +94,10 @@ export default function ProfilePreferencesPage() {
         </div>
       </header>
 
-      <main className="grid grid-cols-[minmax(0,1fr)_320px] gap-4 p-6">
+      <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_320px] md:p-6">
         <section className="card p-4">
           <h2 className="text-lg font-semibold text-neutral-900">Profile</h2>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <ProfileField label="Display Name" value={profile.displayName} />
             <ProfileField label="Email" value={profile.email} />
             <ProfileField label="Employee Code" value={profile.employeeCode} />
@@ -163,7 +163,7 @@ export default function ProfilePreferencesPage() {
             </button>
           </form>
         </aside>
-      </main>
+      </div>
     </div>
   );
 }

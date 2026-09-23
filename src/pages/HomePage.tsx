@@ -121,20 +121,13 @@ export function HomePage() {
   const activeTabDetails = TABS.find((tab) => tab.key === activeTab) ?? TABS[0];
 
   return (
-    <section className="space-y-4">
+    <section className="legacy-page space-y-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Home</h1>
           <p className="mt-1 text-sm text-neutral-600">Track the request queues that need attention today.</p>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => navigate("/requests/new")}
-            className="btn btn-primary"
-          >
-            New Request
-          </button>
           <button
             type="button"
             onClick={refreshDashboard}

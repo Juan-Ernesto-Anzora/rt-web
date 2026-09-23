@@ -637,7 +637,7 @@ export default function RequestDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="legacy-page">
       <header className="border-b border-neutral-200 bg-white px-4 py-4 sm:px-6">
         <button
           type="button"
@@ -658,7 +658,7 @@ export default function RequestDetailPage() {
         </div>
       </header>
 
-      <main className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">
           {error && <ErrorState message={error} />}
 
@@ -764,7 +764,7 @@ export default function RequestDetailPage() {
           <DetailField label="Created" value={formatDate(detail.createdAt)} />
           <DetailField label="Updated" value={formatDate(detail.updatedAt)} />
         </aside>
-      </main>
+      </div>
     </div>
   );
 }

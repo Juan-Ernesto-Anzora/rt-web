@@ -331,30 +331,39 @@ async function login(page: Page) {
   await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
 }
 
+async function openAdminSection(page: Page, name: string) {
+  if (await page.getByRole("button", { name: "Open navigation" }).isVisible()) {
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByRole("dialog", { name: "Navigation" }).getByRole("link", { name, exact: true }).click();
+  } else {
+    await page.getByRole("navigation", { name: "Administration navigation" }).getByRole("link", { name, exact: true }).click();
+  }
+}
+
 test("admin login and Sprint 3 navigation smoke", async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on("pageerror", (error) => pageErrors.push(error));
   await mockApi(page);
   await login(page);
-  await page.getByRole("button", { name: "Admin", exact: true }).click();
+  await openAdminSection(page, "Overview");
   await expect(page.getByRole("heading", { name: "Admin" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Users" }).click();
+  await openAdminSection(page, "Users");
   await expect(page.getByRole("heading", { name: "Users and memberships" })).toBeVisible();
   await expect(page.getByText("Agent User")).toBeVisible();
 
-  await page.getByRole("button", { name: "Workflows" }).click();
+  await openAdminSection(page, "Workflows");
   await expect(page.getByRole("heading", { name: "Workflows" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Reports" }).click();
+  await openAdminSection(page, "Reports");
   await expect(page.getByRole("heading", { name: "Reports" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Priority breakdown" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Settings" }).click();
+  await openAdminSection(page, "Settings");
   await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "General settings" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Audit" }).click();
+  await openAdminSection(page, "Audit");
   await expect(page.getByRole("heading", { name: "Audit" })).toBeVisible();
   await expect(page.getByText("Admin · role · updated")).toBeVisible();
   expect(pageErrors).toEqual([]);
@@ -379,9 +388,9 @@ test("Sprint 3 admin and request detail avoid page-level mobile overflow", async
   await page.setViewportSize({ width: 320, height: 720 });
   await mockApi(page);
   await login(page);
-  await page.getByRole("button", { name: "Admin", exact: true }).click();
+  await openAdminSection(page, "Overview");
   for (const section of ["Users", "Roles & Permissions", "Workflows", "Reports", "Settings", "Audit"]) {
-    await page.getByRole("button", { name: section, exact: true }).click();
+    await openAdminSection(page, section);
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
   await page.goto("/requests/a0000000-0000-4000-8000-000000000010");
@@ -392,8 +401,8 @@ test("Sprint 3 admin and request detail avoid page-level mobile overflow", async
 test("workflow create and edit use POST then PATCH", async ({ page }) => {
   await mockApi(page);
   await login(page);
-  await page.getByRole("button", { name: "Admin", exact: true }).click();
-  await page.getByRole("button", { name: "Workflows", exact: true }).click();
+  await openAdminSection(page, "Overview");
+  await openAdminSection(page, "Workflows");
   await page.getByRole("button", { name: "New", exact: true }).click();
   await page.getByRole("dialog").getByLabel("Name *").fill("WEB-D10 Workflow");
   await page.getByRole("dialog").getByLabel("Description").fill("Created in browser smoke");
