@@ -37,6 +37,9 @@ test(`${scenario.preference} with OS ${scenario.os} resolves before React execut
 
 test("existing preferences Save applies theme, preserves fields, and follows System", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
+  await page.route("**/api/admin/me/permissions/", route => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify({ is_admin: false, permissions: [] }),
+  }));
   await page.addInitScript(() => {
     localStorage.setItem("access", "synthetic-theme-test");
     localStorage.setItem("tenant", "ACME");

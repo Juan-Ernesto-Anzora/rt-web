@@ -12,6 +12,7 @@
     "test:theme": "node --test tests/theme.test.cjs",
     "test:primitives": "playwright test tests/e2e/primitives.spec.ts",
     "test:theme:preview": "npm run build && playwright test --config playwright.preview.config.ts",
+    "test:dashboard:preview": "npm run build && playwright test --config playwright.dashboard.preview.config.ts",
     "lint": "eslint .",
     "test": "playwright test",
     "test:e2e": "playwright test",

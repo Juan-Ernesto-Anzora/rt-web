@@ -1,5 +1,81 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active calibration: M5D Dashboard visual hierarchy
+
+M5C is locally complete on `feat/dashboard-redesign`; its uncommitted work is preserved. M5D is a bounded visual calibration, not a new data or feature milestone. The Home search field already submits to global `/search?q=...`; it does not filter the queue. Current Light/Dark captures show a heavily framed results surface, repeated Open buttons and redundant `Priority:` labels.
+
+Plan: (1) use the existing public `request_id` to make request titles native route links, leaving rows without an ID noninteractive; (2) use a Dashboard-only concise PriorityIndicator presentation while preserving its existing default elsewhere; (3) reduce table/queue/filter outlines, retain semantic separation and focus, and clarify Home search scope; (4) update focused browser selectors and inspect fresh Light/Dark captures at 1440/1024/768/320; (5) run the complete Web gate. Acceptance: zero changed API/URL/queue/RBAC behavior, zero Home row Detail fetches, semantic table/list and keyboard navigation, no page overflow, all local checks green. M6 is excluded.
+
+### Progress
+
+- [x] Read instructions, Blueprint v1.1, M3/M4/M5 design documents, current Dashboard source/tests and inspect M5C Light/Dark/320 captures.
+- [x] Apply only visual/markup calibration in Home and request-row presentation.
+- [x] Update focused navigation/visual assertions and inspect new responsive/theme captures.
+- [x] Run full local gate and record scope, evidence, limitations and M6 handoff.
+
+### Surprises & Discoveries
+
+- M5C's Home search form navigates to unified Search with `q`; it does not narrow the current queue. The global shell Search link is a destination without a query field, so the Home form remains a useful quick entry despite duplication.
+- The desktop table had no literal vertical cell borders; its outer frame, many horizontal rules and repeated button column created the grid-heavy impression. Removing the frame/action column and softening row separators addressed the observed issue without inventing a new table component.
+- The existing theme-preferences browser test used a synthetic token but did not intercept the AppShell permissions call. With a live API on port 8000, a 401 redirected it to Login after reload. A single contract-shaped permission mock now makes the theme test independent of live backend state; no product auth behavior changed.
+
+### Decision Log
+
+- Prefer a native title link over a whole-row click target or repeated Open button. The title is the single keyboard navigation target per request; absent `request_id` leaves readable non-link text.
+- Keep PriorityIndicator's existing default label for other consumers and expose concise text only in the Dashboard desktop Priority column.
+- At compact widths there is no visible Priority column heading, so keep the prefixed default there; use concise text only in the desktop table. Preserve all four known values and neutral treatment of unknown server text.
+- Keep the Home search query shortcut but make its global Search destination explicit in copy, rather than implying a local queue filter or removing existing capability.
+
+### Outcomes & Retrospective
+
+M5D is **PASS locally**. The calibrated table/list uses title links, no repeated Open column or outer results frame, and softened horizontal row separators with hover/focus-within treatment. The desktop Priority column shows concise values; compact rows retain the prefixed default for context. Queue selection is flatter with an active underline, inactive quick filters are quieter, the KPI numbers have restrained weight, and Home search explicitly names its global scope. The updated 1440 Light/Dark, 1024 Light, 768 Dark and 320 Light captures were inspected: no page-level overflow, lost metadata or card/pill/gradient drift. Keyboard title-link and pressed-state assertions pass; no full WCAG/screen-reader certification is claimed.
+
+Final local gate: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` (152 modules), `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), `npm.cmd run test:e2e -- --workers=1 --retries=0` (48), `npm.cmd run test:dashboard:preview` (14), `npm.cmd run test:theme:preview` (5), and `git diff --check` all pass. The Dashboard preview still asserts one summary plus one list request and zero row Detail reads for 0/1/10 rows. Browser data uses intercepted APIs. The first full browser pass failed only because a preexisting theme-preferences fixture used a synthetic token against a newly running live API; a narrow permission-response mock isolated that test, and the final no-retry full/preview runs pass. Live integration, hosted CI and renderer-stable golden snapshots remain unverified.
+
+Only M5D files changed on top of the preserved uncommitted M5C diff: `src/pages/HomePage.tsx`, `src/components/dashboard/KpiCard.tsx`, `src/components/requests/{RequestTable,PriorityIndicator}.tsx`, `tests/e2e/{dashboard,theme-runtime}.spec.ts`, `docs/design/06-dashboard.md` and this ExecPlan. No API client/contract, route, RBAC, queue/filter/URL semantics, data request count, dependency or M6 Search implementation was altered. No commit/PR was requested. Exact M6 handoff remains the M5C handoff below: separately verify the Search/list contract, then redesign Search/queues and remove Search's own detail fan-out while preserving auth/tenant, real results, URL state and error/empty behavior.
+
+## Active implementation: M5C operational Dashboard
+
+M5A is merged on `feat/dashboard-redesign`; the user reports M5B complete. A read-only sibling API checkout at `dc3b3a2` confirms list-only nested status/requester/assignee/flow summaries and validated `mine`, `requested_by_me`, `closed`, `priority`, `assignee`, and both updated-at sort values. Deployed API state is unverified. Implement the approved Home-only redesign from `docs/design/06-dashboard.md` and `docs/plans/sprint-4/m5-dashboard-data-contract.md`.
+
+Plan: (1) remove `enrichRequestsWithDetail` from `src/api/dashboard.ts` while normalizing the M5B row and retaining shared Axios auth/tenant handling; (2) drive Home queue, one quick filter, sort and page from URLSearchParams, canonicalizing malformed/contradictory values; (3) compose restrained KPI strip, queue toolbar, semantic desktop table/compact rows, paging, and isolated summary/list/loading/empty/error states using M3 primitives; (4) add permanent API-mocked Playwright tests for request counts, URLs, fields, navigation, themes, widths and errors; (5) update the Dashboard spec and run the full Web gate. Home search remains a link into existing `/search?q=`. Scope excludes Search enrichment, other product pages, API, routes, RBAC, new dependencies and density runtime.
+
+- [x] M5B list summaries wired and Home row Detail calls removed.
+- [x] URL-backed queue/filter/sort/page and operational Dashboard UI.
+- [x] Permanent behavioral, count, keyboard-operable control, theme and responsive tests.
+- [x] Visual evidence, docs/ExecPlan outcomes and complete local Web gate.
+
+### Progress
+
+- [x] Reconcile M5B API read-only at sibling commit `dc3b3a2`; no API files edited and deployment unverified.
+- [x] Remove Home Detail enrichment; normalize list nested labels and guard missing public IDs.
+- [x] Implement canonical URL-backed queue/quick/page/sort, isolated summary/list states, compact semantic layout and pagination.
+- [x] Add fourteen permanent mocked Dashboard browser tests and production-preview count assertions for 0, 1 and 10 rows.
+- [x] Complete local typecheck/lint/build/token/theme/full functional/preview checks and `git diff --check`.
+
+### Surprises & Discoveries
+
+- The M5B list serializer already has nested row labels and both updated-at sort directions in the checked-out API; no Web-side metadata lookup is needed. That checkout does not establish deployed API status.
+- The old Home normalizer had a status-ID fallback capable of displaying a raw UUID when the nested label was absent; M5C now uses `Status unavailable` instead.
+- React StrictMode may repeat development mount effects; production-preview Playwright asserts the exact initial two Dashboard data calls, separate from shell permission reads.
+- The prior M5A spec proposed a Recently Updated quick filter, but it duplicated the retained Recently Updated queue and is absent from the latest four-filter M5C authorization.
+- The full Web run exposed an existing Sprint 3 smoke locator that targeted a hidden, still-mounted New Workflow dialog after creation. Scoping to the visible Description textbox resolved the test timeout without changing Admin runtime behavior.
+
+### Decision Log
+
+- Keep Home queue/filter/page/sort in the existing `/` query string, not in new routes or session storage. Canonicalize invalid and contradictory My Open states, reset page after scope/sort changes, and retain browser history.
+- Show tenant-wide KPIs as informational because none has an exact corresponding list predicate. Use one list request for row labels, never per-row Detail reads.
+- Use a semantic table from 1024px and compact list below, with M3 primitives/tokens and shared status/priority presentation. Do not migrate Search or other legacy pages.
+- Keep one permanent preview-specific Playwright config and CI step to prove production request counts; dev StrictMode is not a reliable exact-count environment.
+
+### Outcomes & Retrospective
+
+M5C is **PASS locally**. `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` (152 modules), `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), `npm.cmd run test:e2e -- --workers=1 --retries=0` (48), `npm.cmd run test:dashboard:preview` (14), the existing `npm.cmd run test:theme:preview` (5), and `git diff --check` pass. The Dashboard preview asserts exactly one summary GET and one list GET on initial 0/1/10-row loads and zero row Detail calls. Queue/filter/page changes use one list GET; full Refresh uses summary and list. The separate shell permissions GET is excluded. Tests use intercepted contract-shaped APIs, not live API or SQL Server; no response-time improvement is asserted from HTTP counts alone. The documented pnpm launcher issue remains; npm equivalents were used without machine/tooling changes. Browserslist-age and terminal-color warnings are nonblocking.
+
+Visual captures in ignored `.agent/tmp/m5-dashboard/` were inspected for populated 320/768/1024/1440 Light/Dark states and 1440 empty/list-error/summary-error states. Deterministic browser assertions cover one Home h1, button/pressed semantics, keyboard queue selection, text-plus-color status/priority, disabled missing-ID navigation, live count/loading, URL history and lack of page-level overflow. These checks are bounded evidence, not a complete WCAG 2.2 AA certification or cross-platform golden-image comparison. Search retains its independent detail fan-out and legacy styling for M6. No new route, API, RBAC, KPI meaning, chart, dependency, density runtime or other page redesign was added. Live M5B deployment, real-network timings, visual baseline stability on CI and hosted CI remain unverified; the PR gate still requires hosted checks.
+
+Exact M6 handoff: redesign Search and its queues only after separately confirming the current search/list API contract, then remove Search's independent detail fan-out and preserve URL state, auth/tenant, real results and empty/error behavior. Do not treat this M5C work as permission to change Request Detail, Create or Admin.
+
 ## Active investigation: M5A Dashboard UX and data-contract audit
 
 M1-M4 are reported merged; this Web checkout is clean at branch `feat/dashboard-foundation`, based on `3a0fc90`. M5 is split into **M5A specification (this task), M5B API list-contract work in rt-api, and M5C Web Dashboard implementation**. The active deliverables are `docs/design/06-dashboard.md` and `docs/plans/sprint-4/m5-dashboard-data-contract.md`; they are self-contained and normative Blueprint v1.1 remains unchanged. This milestone authorizes documentation only.
