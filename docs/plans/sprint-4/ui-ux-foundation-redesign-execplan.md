@@ -11,7 +11,7 @@ Purpose: make the existing PR #28 `ci-web` gate exercise the completed M5C/M5D D
 - [x] Apply only the test-build environment correction; remove temporary probe/config.
 - [x] Complete the full available local gate with the same build-time API base and capture production Dashboard request-count evidence.
 - [x] Commit/push the fix to PR #28; hosted `ci-web` run `36206349455` passed for `3795ff8`.
-- [ ] Push this final hosted-evidence note and confirm the check on the resulting PR head.
+- [x] Push the hosted-evidence note as `3f5369b` and confirm the resulting PR-head `ci-web` run `36206590520` passed.
 
 ### Surprises & Discoveries
 
@@ -30,7 +30,7 @@ Root cause is proven and the minimal CI correction is in place. The desktop pnpm
 
 The Admin PATCH wait was flaky in both the earlier failing hosted run and the first passing hosted rerun; each retry passed, and the local no-retry run passed. The production Admin code was not changed by M5C/M5D or this closeout. Its precise trigger is not established, so no speculative workflow refactor, retry adjustment or timeout increase was made; retain it as separately tracked test debt for a reproducible investigation.
 
-Hosted evidence for CI-fix commit `3795ff8`: PR #28 `ci-web` run [36206349455](https://github.com/Juan-Ernesto-Anzora/rt-web/actions/runs/36206349455) passed in 2m12s. The browser smoke reported 47 passed and the unrelated Admin workflow case flaky/pass-on-retry; theme preview passed 5/5 and Dashboard preview passed 14/14. This is an actual hosted pass, not an inference from local tests. Because this evidence update changes the PR head, merge readiness is pending a final check on that head. M6 remains out of scope; after this closeout, the exact M6 starting point is the independently verified Search/list contract and Search's own fan-out, as documented below.
+Hosted evidence for CI-fix commit `3795ff8`: PR #28 `ci-web` run [36206349455](https://github.com/Juan-Ernesto-Anzora/rt-web/actions/runs/36206349455) passed in 2m12s. The browser smoke reported 47 passed and the unrelated Admin workflow case flaky/pass-on-retry; theme preview passed 5/5 and Dashboard preview passed 14/14. The follow-up evidence commit `3f5369b` also passed on its own PR-head [run 36206590520](https://github.com/Juan-Ernesto-Anzora/rt-web/actions/runs/36206590520) in 2m9s. These are actual hosted passes, not inferences from local tests. The only remaining merge gate for this documentation closeout is the check triggered by committing this verified final record. M6 remains out of scope; after this closeout, the exact M6 starting point is the independently verified Search/list contract and Search's own fan-out, as documented below.
 
 ## Active calibration: M5D Dashboard visual hierarchy
 
