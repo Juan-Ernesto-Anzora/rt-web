@@ -1,5 +1,36 @@
 # Establish the Request Tracker UI/UX foundation
 
+## M5D hosted CI closeout: build-time Dashboard fixture base
+
+Purpose: make the existing PR #28 `ci-web` gate exercise the completed M5C/M5D Dashboard against the same contract-shaped fixtures in production preview as in development. No application API, route, queue, theme, RBAC or visual behavior changes are authorized. The active branch is `feat/dashboard-redesign`, based on the existing PR against `main`.
+
+### Progress
+
+- [x] Inspect workflow, Vite/Playwright configs, API client, package scripts, PR diff and failed hosted run `35948866669`.
+- [x] Reproduce preview failure from a bundle built without `VITE_API_BASE`, then rebuild with the test API base and verify the same focused preview passes.
+- [x] Apply only the test-build environment correction; remove temporary probe/config.
+- [x] Complete the full available local gate with the same build-time API base and capture production Dashboard request-count evidence.
+- [ ] Commit/push to PR #28 and confirm a green hosted `ci-web` run before declaring merge readiness.
+
+### Surprises & Discoveries
+
+- The clean hosted checkout had no local `.env`; Vite inlined no API base at build time. In the absent-env local reproduction, Chromium requested `http://127.0.0.1:4173/dashboard/summary/` and `/requests/?page=1&page_size=10&sort=-updated_at&mine=true`, outside the fixture's `/api/` route. The focused production test failed because its fixture row never appeared. Rebuilding with `VITE_API_BASE=http://127.0.0.1:8000/api` produced requests under `/api/dashboard/summary/` and `/api/requests/`; the same test passed. Local earlier previews had silently loaded the ignored `.env`, so they did not reproduce CI.
+- Hosted normal Chromium smoke reported 47 passed and one flaky Sprint 3 workflow create/edit case: the first attempt timed out waiting for PATCH, then a retry passed. No Dashboard or Workflow Admin production source in this CI fix explains a deterministic regression. Leave it as separate test debt unless new evidence establishes a specific minimal correction.
+- The local desktop `pnpm.cmd` wrapper still stops before scripts with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; npm equivalents are required here. This is not a hosted pnpm failure.
+
+### Decision Log
+
+- Set `VITE_API_BASE` only on `.github/workflows/ci-web.yml`'s Vite build step. That `dist` is used by the subsequent production theme and Dashboard preview tests and is not uploaded or deployed by this workflow. Normal development smoke already gives its Vite dev server the same test URL. Setting an env variable on `vite preview` would be too late because Vite replaces `import.meta.env` during build.
+- Do not change `src/lib/api.ts`, fixture matchers, retries/timeouts, or app behavior to compensate for the missing build value. Keep one build artifact for both preview suites.
+
+### Outcomes & Retrospective
+
+Root cause is proven and the minimal CI correction is in place. The desktop pnpm wrapper aborted `pnpm install --frozen-lockfile` and `pnpm exec vite build` before running the requested tools with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; the existing installed dependencies were kept intact. Using the documented npm equivalents, `npm.cmd run typecheck`, `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), `npm.cmd run lint`, and `npm.cmd run build` (152 modules) all passed. That final build had explicit `VITE_API_BASE=http://127.0.0.1:8000/api`. `npm.cmd run test:e2e -- --workers=1 --retries=0` passed 48/48, including the previously hosted-flaky Admin case; `npm.cmd run test:e2e -- --config playwright.preview.config.ts --workers=1 --retries=0` passed 5/5, and the same command with `playwright.dashboard.preview.config.ts` passed 14/14. Production Dashboard assertions still prove one summary GET, one list GET and zero row Detail GETs on initial 0/1/10-row loads. These are intercepted browser APIs, not live-service verification. Hosted rerun and diff check are recorded separately after the final edit.
+
+The Admin PATCH wait was flaky only in the earlier hosted run and passed on retry there and without retry locally. The production Admin code was not changed by M5C/M5D or this closeout. Its precise trigger is not established, so no speculative workflow refactor, retry adjustment or timeout increase was made; retain it as test debt for a separate reproducible investigation.
+
+M5D is not closed for merge until the actual PR check is green. M6 remains out of scope; after this closeout, the exact M6 starting point is the independently verified Search/list contract and Search's own fan-out, as documented below.
+
 ## Active calibration: M5D Dashboard visual hierarchy
 
 M5C is locally complete on `feat/dashboard-redesign`; its uncommitted work is preserved. M5D is a bounded visual calibration, not a new data or feature milestone. The Home search field already submits to global `/search?q=...`; it does not filter the queue. Current Light/Dark captures show a heavily framed results surface, repeated Open buttons and redundant `Priority:` labels.
