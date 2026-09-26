@@ -10,7 +10,8 @@ Purpose: make the existing PR #28 `ci-web` gate exercise the completed M5C/M5D D
 - [x] Reproduce preview failure from a bundle built without `VITE_API_BASE`, then rebuild with the test API base and verify the same focused preview passes.
 - [x] Apply only the test-build environment correction; remove temporary probe/config.
 - [x] Complete the full available local gate with the same build-time API base and capture production Dashboard request-count evidence.
-- [ ] Commit/push to PR #28 and confirm a green hosted `ci-web` run before declaring merge readiness.
+- [x] Commit/push the fix to PR #28; hosted `ci-web` run `36206349455` passed for `3795ff8`.
+- [ ] Push this final hosted-evidence note and confirm the check on the resulting PR head.
 
 ### Surprises & Discoveries
 
@@ -27,9 +28,9 @@ Purpose: make the existing PR #28 `ci-web` gate exercise the completed M5C/M5D D
 
 Root cause is proven and the minimal CI correction is in place. The desktop pnpm wrapper aborted `pnpm install --frozen-lockfile` and `pnpm exec vite build` before running the requested tools with `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`; the existing installed dependencies were kept intact. Using the documented npm equivalents, `npm.cmd run typecheck`, `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), `npm.cmd run lint`, and `npm.cmd run build` (152 modules) all passed. That final build had explicit `VITE_API_BASE=http://127.0.0.1:8000/api`. `npm.cmd run test:e2e -- --workers=1 --retries=0` passed 48/48, including the previously hosted-flaky Admin case; `npm.cmd run test:e2e -- --config playwright.preview.config.ts --workers=1 --retries=0` passed 5/5, and the same command with `playwright.dashboard.preview.config.ts` passed 14/14. Production Dashboard assertions still prove one summary GET, one list GET and zero row Detail GETs on initial 0/1/10-row loads. These are intercepted browser APIs, not live-service verification. Hosted rerun and diff check are recorded separately after the final edit.
 
-The Admin PATCH wait was flaky only in the earlier hosted run and passed on retry there and without retry locally. The production Admin code was not changed by M5C/M5D or this closeout. Its precise trigger is not established, so no speculative workflow refactor, retry adjustment or timeout increase was made; retain it as test debt for a separate reproducible investigation.
+The Admin PATCH wait was flaky in both the earlier failing hosted run and the first passing hosted rerun; each retry passed, and the local no-retry run passed. The production Admin code was not changed by M5C/M5D or this closeout. Its precise trigger is not established, so no speculative workflow refactor, retry adjustment or timeout increase was made; retain it as separately tracked test debt for a reproducible investigation.
 
-M5D is not closed for merge until the actual PR check is green. M6 remains out of scope; after this closeout, the exact M6 starting point is the independently verified Search/list contract and Search's own fan-out, as documented below.
+Hosted evidence for CI-fix commit `3795ff8`: PR #28 `ci-web` run [36206349455](https://github.com/Juan-Ernesto-Anzora/rt-web/actions/runs/36206349455) passed in 2m12s. The browser smoke reported 47 passed and the unrelated Admin workflow case flaky/pass-on-retry; theme preview passed 5/5 and Dashboard preview passed 14/14. This is an actual hosted pass, not an inference from local tests. Because this evidence update changes the PR head, merge readiness is pending a final check on that head. M6 remains out of scope; after this closeout, the exact M6 starting point is the independently verified Search/list contract and Search's own fan-out, as documented below.
 
 ## Active calibration: M5D Dashboard visual hierarchy
 
