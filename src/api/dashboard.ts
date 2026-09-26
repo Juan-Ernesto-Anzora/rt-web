@@ -1,7 +1,5 @@
 import api from "../lib/api";
-import { getRequestDetail } from "./requestDetail";
 import {
-  displayAssignee,
   displayFlow,
   displayStatus,
   displayUser,
@@ -38,8 +36,8 @@ export type DashboardListParams = {
   list: DashboardListKey;
   page?: number;
   pageSize?: number;
-  sort?: string;
-  quickFilter?: string;
+  sort?: "-updated_at" | "updated_at";
+  quickFilter?: "my_open" | "high_priority" | "closed" | "unassigned" | "";
 };
 
 export type DashboardListResponse = {
@@ -93,44 +91,22 @@ type DashboardSummaryDto = {
 
 function normalizeRequest(request: RequestDto): DashboardRequest {
   const requestId = request.request_id ?? "";
+  const statusLabel = displayStatus(request.status, request.status_name ?? request.status_category);
+  const requesterLabel = displayUser(request.requester, request.requester_name);
+  const flowLabel = displayFlow(request.flow, request.flow_name);
   return {
-    id: (request.human_id ?? request.humanid ?? requestId) || request.requestid || "-",
+    id: request.human_id ?? request.humanid ?? "ID unavailable",
     requestId,
     title: request.title ?? "Untitled request",
-    status: displayStatus(request.status, request.status_name ?? request.status_category ?? request.statusid ?? request.status_id),
+    status: statusLabel === "-" ? "Status unavailable" : statusLabel,
     statusCategory: statusCategory(request.status, request.status_category),
     priority: request.priority ?? "-",
-    assignee: displayAssignee(request.assignee, request.assignee_name),
-    requester: displayUser(request.requester, request.requester_name),
+    assignee: request.assignee === null && !request.assignee_id ? "Unassigned" : request.assignee ? displayUser(request.assignee, request.assignee_name, "Assignee unavailable") : "Assignee unavailable",
+    requester: requesterLabel === "-" ? "Requester unavailable" : requesterLabel,
     updatedAt: request.updated_at ?? "",
-    flow: displayFlow(request.flow, request.flow_name),
+    flow: flowLabel === "-" ? "Flow unavailable" : flowLabel,
     dueAt: request.due_at,
   };
-}
-
-async function enrichRequestsWithDetail(requests: DashboardRequest[]) {
-  const enriched = await Promise.all(
-    requests.map(async (request) => {
-      if (!request.requestId) return request;
-      try {
-        const detail = await getRequestDetail(request.requestId);
-        return {
-          ...request,
-          status: detail.status,
-          statusCategory: detail.statusCategory,
-          assignee: detail.assignee,
-          requester: detail.requester,
-          flow: detail.flow,
-          priority: detail.priority,
-          dueAt: detail.dueAt,
-          updatedAt: detail.updatedAt || request.updatedAt,
-        };
-      } catch {
-        return request;
-      }
-    }),
-  );
-  return enriched;
 }
 
 function normalizeList(data: RequestListDto | RequestDto[]): DashboardListResponse {
@@ -188,9 +164,5 @@ export async function getDashboardRequests(params: DashboardListParams): Promise
   const response = await api.get<RequestListDto | RequestDto[]>("/requests/", {
     params: paramsForList(params),
   });
-  const normalized = normalizeList(response.data);
-  return {
-    ...normalized,
-    results: await enrichRequestsWithDetail(normalized.results),
-  };
+  return normalizeList(response.data);
 }

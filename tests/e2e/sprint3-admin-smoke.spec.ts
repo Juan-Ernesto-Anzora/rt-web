@@ -414,12 +414,15 @@ test("workflow create and edit use POST then PATCH", async ({ page }) => {
   ]);
   
   expect(createRequest.postDataJSON()).toEqual({ name: "WEB-D10 Workflow", description: "Created in browser smoke" });
-  await expect(page.getByLabel("Name *").first()).toHaveValue("WEB-D10 Workflow");
-  await page.getByLabel("Description").first().fill("Updated in browser smoke");
+  await expect(page.getByRole("dialog", { name: "Create workflow" })).not.toBeVisible();
+  const workflowForm = page.locator("form").filter({ hasText: "Workflow detail" });
+  await expect(workflowForm.getByRole("textbox", { name: "Name *" })).toHaveValue("WEB-D10 Workflow");
+  await workflowForm.getByRole("textbox", { name: "Description" }).fill("Updated in browser smoke");
+  await expect(workflowForm.getByRole("button", { name: "Save workflow" })).toBeEnabled();
   
   const [patchRequest] = await Promise.all([
     page.waitForRequest((request) => request.method() === "PATCH" && /\/api\/admin\/workflows\/[0-9a-f-]+\/$/.test(new URL(request.url()).pathname)),
-    page.getByRole("button", { name: "Save workflow" }).click()
+    workflowForm.getByRole("button", { name: "Save workflow" }).click()
   ]);
   
   expect(patchRequest.postDataJSON()).toEqual({ name: "WEB-D10 Workflow", description: "Updated in browser smoke" });
