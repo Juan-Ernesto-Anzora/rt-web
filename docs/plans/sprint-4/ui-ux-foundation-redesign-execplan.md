@@ -1,5 +1,41 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active audit: M6A Search UX and API contract
+
+M5C/M5D are merged by PR #28 at Web HEAD `e9438ae`; the clean current branch is `feat/search-foundation`. This task is documentation/audit only. Deliverables: `docs/design/07-search.md`, `docs/plans/sprint-4/m6-search-data-contract.md`, and this ExecPlan. The sibling API is read-only at `288ea61` on `main`, containing merged M5B list summaries. The live `http://127.0.0.1:8000/api/schema` connection is refused; deployed/generated-live contract state remains unverified.
+
+Plan: inspect Search page/client/enrichment and merged Dashboard patterns; trace API Search serializers/view/FTS/model/catalog/schema annotations/tests; measure 0/1/10/25-result HTTP behavior and representative widths with a disposable intercepted browser fixture if practical; document parameter/content/field/facet matrices and architecture options; define bounded M6B API and M6C Web acceptance without implementing either. Done criteria: evidence-backed contracts/UX and handoffs, resolved document references, zero runtime or sibling diff, clean whitespace checks. No dependency, SQL, API or product behavior changes; no commit/PR is requested.
+
+### Progress
+
+- [x] Confirm merged baseline, clean branch, instructions and current Web/API source.
+- [x] Complete Search parameter/content/summary/facet/relevance/URL matrices.
+- [x] Measure mocked request counts and inspect responsive/theme evidence.
+- [x] Create both durable specs and exact M6B/M6C handoffs.
+- [x] Verify references, docs-only scope, sibling unchanged and `git diff --check`.
+
+### Surprises & Discoveries
+
+- Search still unconditionally enriches each valid result via `getRequestDetail`; M5B added summaries only to request-list reads, not the FTS Search response.
+- Web sends repeated display-label `status/assignee/flow/tag` parameters while Search API accepts singular UUID `status_id/assignee_id/flow_id`; its `sort` is not declared or consumed.
+- The Search mount URL-sync effect sets a fresh submitted-filter object after the initial search effect. Measure the resulting duplicate initial requests separately from the per-invocation `1 + N` formula.
+- Production fixture confirmed single submission totals 1/2/11/26 for N=0/1/10/25; nonempty-q initial deep links made 2/4/22/52. One shell permission GET was excluded. A facet toggle made no request, and its later submit sent ignored `status=Open`, not `status_id`.
+- Current Search provides no tags or true snippet/highlight. All facets use the enriched current page; API has singular UUID filters and fixed source-weighted rank rather than the Web's ignored sort. Placeholder claims about ID/tags/assignee search need explicit product-copy reconciliation.
+- A populated fixture overflowed at 1440/1024/768/320; the 280px rail leaves a 456px result region at 1024, and narrow filter/result content grew to about 982px. Dark retains a light Search canvas with mismatched semantic badges/pagination/input text. Existing shell tests exercise empty Search, so they do not establish populated-page readiness.
+
+### Decision Log
+
+- Keep `/search` and the existing request-centered FTS endpoint. Do not repurpose Dashboard queues or list predicates as Search capabilities without contract evidence.
+- Treat unavailable live schema/SQL as an evidence limitation, not permission to start services or change the read-only API repository.
+- Recommend additive Search summaries using M5B StatusSummarySerializer/UserLookupSerializer/FlowLookupSerializer and bounded tenant-safe page hydration, not the request-list endpoint plus an unimplemented q or full Detail cloning.
+- First M6C uses truthful Search copy, optional filter band, singular catalog-backed Flow/Status/Assignee/updated bounds, fixed weighted best-match order, semantic M5D rows/title links and URL-backed applied state. Defer Tag/Human-ID/snippets/new sorts/extra business filters; M6B must settle dates, stable ties/counts, privacy-policy equivalence and query-budget evidence before Web wiring.
+
+### Outcomes & Retrospective
+
+M6A is **PASS for documentation/source and intercepted-browser audit**. Created `docs/design/07-search.md` and `docs/plans/sprint-4/m6-search-data-contract.md`; source/content/parameter/response/facet/rank matrices and bounded API alternatives/handoffs are complete. All 39 unique cited Web/sibling/document paths resolve; both new specs have no trailing whitespace, and `git diff --check` passes. Only the two new specs and this plan changed; API checkout remains read-only/unchanged. No full functional/lint/type gate or hosted CI was rerun for this non-PR docs task. An explicit-test-base production build passed (152 modules) solely to support the temporary Chromium measurement. Ignored `.agent/tmp/m6a-search-audit.cjs` and `.agent/tmp/m6a-search/` retain synthetic repeatable captures/JSON; none is tracked. The temporary preview server was stopped. No live API/SQL timing/query-count, deployed schema, accessibility certification or golden-image pass is claimed.
+
+M6B next scope is API Search serializer/service/schema/tests only: compact shared summaries, singular filters with documented date semantics, deterministic weighted ties, reliable empty-page count and bounded tenant-safe hydration, keeping endpoint/envelope/FTS meaning. M6C starts only after that contract is verified: remove Search Detail enrichment and duplicate initial effects, wire correct ID catalogs, apply URL state/history, and implement the spec with shared semantic rows/primitives and permanent production request-count/theme/keyboard/responsive tests. M5D and older sections below are historical evidence, not authorization to implement M6B/M6C in M6A.
+
 ## M5D hosted CI closeout: build-time Dashboard fixture base
 
 Purpose: make the existing PR #28 `ci-web` gate exercise the completed M5C/M5D Dashboard against the same contract-shaped fixtures in production preview as in development. No application API, route, queue, theme, RBAC or visual behavior changes are authorized. The active branch is `feat/dashboard-redesign`, based on the existing PR against `main`.
