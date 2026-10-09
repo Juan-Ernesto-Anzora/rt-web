@@ -150,8 +150,9 @@ for (const [width, color] of [[320, "light"], [768, "dark"], [1024, "light"], [1
     await expect(page.locator("html")).toHaveAttribute("data-theme", color);
     const shell = page.getByRole("banner");
     await expect(shell).toHaveCSS("background-color", color === "dark" ? "rgb(39, 39, 42)" : "rgb(255, 255, 255)");
-    await expect(page.getByRole("heading", { name: "Search Requests" })).toHaveCSS("color", "rgb(15, 23, 42)");
-    await expect(page.locator(".legacy-page")).toHaveCSS("color-scheme", "light");
+    await expect(page.getByRole("heading", { name: "Search Requests" })).toHaveCSS("color", color === "dark" ? "rgb(244, 244, 245)" : "rgb(15, 23, 42)");
+    await expect(page.locator(".legacy-page")).toHaveCount(0);
+    await expect(page.getByRole("main", { name: "Main content" }).locator("section").first()).toHaveCSS("background-color", color === "dark" ? "rgb(24, 24, 27)" : "rgb(248, 250, 252)");
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: `.agent/tmp/m4-shell/search-${width}-${color}.png`, fullPage: true });
     if (width < 1024) {

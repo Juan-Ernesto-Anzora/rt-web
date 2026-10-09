@@ -75,3 +75,6 @@ jobs:
 
       - name: Production Dashboard smoke
         run: pnpm exec playwright test --config playwright.dashboard.preview.config.ts
+
+      - name: Production Search smoke
+        run: pnpm exec playwright test --config playwright.search.preview.config.ts

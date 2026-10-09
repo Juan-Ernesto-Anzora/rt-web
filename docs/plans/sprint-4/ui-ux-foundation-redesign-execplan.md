@@ -1,5 +1,84 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active calibration: M6D Search visual hierarchy
+
+M6C passes the complete local gate on `feat/search-redesign`; its uncommitted work is preserved. M6D is a bounded visual/copy calibration only. The approved Search specification is `docs/design/07-search.md`, with M1-M4 token, primitive and shell contracts unchanged. No M7, API, routing, RBAC, URL/filter/request-count or Dashboard work is authorized.
+
+Plan: review deterministic M6C populated/empty/error/filtered captures, then make a short truthful placeholder plus accessible Search-scope help, distinguish Filters open/closed, compress excess filter-panel spacing and give Find assignee breathing room at 320px while retaining 768px inline density. Keep date fields and Apply/Cancel in normal flow. Calm the panel divider and make applied values readable without pill styling. Extend only focused browser assertions/captures for copy, Dark 320 filters and accessibility. Run the complete local Web gate and record exact evidence; hosted CI remains separate.
+
+### Progress
+
+- [x] Read instructions, M1-M6 design/plan guidance and inspect current Search source and M6C screenshots.
+- [x] Apply Search-only visual/copy changes and adjust focused tests.
+- [x] Inspect Light/Dark 1440, 1024, Dark 768/320 filters-open, filtered, empty/error evidence.
+- [x] Run full local gate, review scope and record M7A handoff.
+
+### Surprises & Discoveries
+
+- The long truthful placeholder carries scope but cannot be read in a narrow field. An associated M3 Field description can carry the scope while the placeholder stays short.
+- The current same-row assignee input/button leaves the 320px input narrow; a two-row input/actions grouping can improve width without making each action full-screen.
+- The selected Filters state previously differed only in `aria-expanded`; a visible Hide filters label and subtle semantic surface now make it apparent to sighted users too.
+- Dark 320 with Filters open and applied-filter captures show the compact header remains clear, controls/actions stay in normal flow and the applied summary wraps as text rather than pills.
+- The first CI-mode browser attempt stopped before tests because the Vite server started for earlier manual review still held port 5173. After identifying and stopping that known rt-web Vite process, Playwright launched its own server and all 75 tests passed without retries. This was an environment collision, not a product/test failure.
+
+### Decision Log
+
+- Use visible Hide filters wording plus the existing `aria-expanded` contract; avoid a permanent heavy selected pill or a new disclosure primitive.
+- Preserve the normal-flow action row and existing catalog controls/requests. Any compact AppShell change remains a later global task.
+- Keep M5D Search rows, match context, four KPI-free operational layout and all M6C URL/API state untouched. Calibrate only the input/help, disclosure, filter-band spacing and applied-text emphasis.
+
+### Outcomes & Retrospective
+
+M6D is **PASS locally**. The field keeps an explicit Search requests label with short placeholder and linked truthful scope help; desktop actions align to the field, while the mobile Search action stays full-width and Clear all remains small. The Filters control visibly says Hide filters when expanded, with semantic active surface and unchanged ARIA state. The inline panel uses tighter normal spacing, action-oriented Status help, a full-width narrow assignee input with actions below it, unchanged native date controls and normal-flow Apply/Cancel. Applied values gain modest text emphasis without chips. M5D-style rows, match-context text, full-width desktop workspace, header clearance and Dark layering were preserved. No global AppShell or product-data behavior was changed.
+
+Final local checks: `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run build` with explicit test `VITE_API_BASE` (154 modules), `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), CI-mode `npm.cmd run test:e2e -- --retries=0` (75), and production theme/Dashboard/Search previews (5/14/27) all pass. Search preview retains exactly one initial Search GET and zero per-result Detail GETs for 0/1/10/25 results; catalog and shell reads remain separate. Refreshed ignored screenshots were inspected for normal/long populated, applied filters, empty/error and 1440/1024/768/320 Light/Dark states. Full browser zoom/screen-reader certification and cross-platform golden snapshots remain unverified. The desktop pnpm launcher limitation remains documented, so npm equivalents ran locally; hosted `ci-web` has **not** run for this branch's uncommitted M6C/M6D work. `git diff --check` follows this documentation update.
+
+M6D touched only `src/pages/SearchView.tsx`, `src/components/search/SearchFiltersPanel.tsx`, focused `tests/e2e/search.spec.ts`, `docs/design/07-search.md` and this ExecPlan on top of the preserved M6C diff. No API/SQL contract, Search query or URL semantics, RBAC, routing, Dashboard data, Request Detail, Create, Admin, dependency, lockfile, new palette or UI library change. M6 is **BLOCKED for merge** until the existing branch is committed/reviewed and its hosted `ci-web` gate passes; no commit/PR was requested here.
+
+Exact M7A starting point after separate authorization: perform a read-only Request Detail UX/API contract audit, including real Detail/bundle/subresource request counts, comments/attachments/activity/assignment/transitions/close and permission behavior, responsive/theme/accessibility gaps, and preservation requirements. Produce an M7 Detail specification and staged API/Web handoff before redesigning `/requests/:id`. Do not treat M6D as permission to implement M7.
+
+## Active implementation: M6C unified Search
+
+M6A is merged on Web branch `feat/search-redesign` at `cb2cfe0`. The read-only sibling API checkout at `aa0927d` contains M6B compact Search summaries, stable rank/update/request-ID ordering, corrected totals and date-only day bounds; deployment remains unverified. This milestone changes Web Search only, with bounded shared row reuse. Selected active specifications: `docs/design/07-search.md` and `docs/plans/sprint-4/m6-search-data-contract.md`.
+
+Plan: (1) replace Search Detail enrichment and ignored label/tag/sort parameters with typed M6B summaries and singular UUID/date filters in `src/features/requestSearch.ts`; (2) make `/search` URL query parameters the sole applied state, keep separate drafts, and load catalogs lazily through the shared API client; (3) migrate Search to M3 semantic controls/states and M5D dense rows with optional match-source text, preserving Dashboard behavior; (4) add permanent mocked dev/production browser tests for 0/1/10/25 results, one Search GET/zero Detail, deep links, catalogs, history, themes and populated widths; (5) run the complete local gate, inspect visual evidence and update the specifications. No API, SQL, route, RBAC, Detail/Create/Admin redesign, dependency or new Search capability is authorized.
+
+Acceptance: a submitted nonempty Search state makes one result GET in the production build and none of its rows make Detail GETs; blank query makes zero; IDs/dates survive refresh/Back; filter drafts do not mislabel applied rows; all errors/empty/loading are explicit; no populated document overflow at 1440/1024/768/320; Search works in Light/Dark/System. Catalog GETs and shell permission GETs are measured separately. No hosted CI pass is claimed before it runs.
+
+### Progress
+
+- [x] Read instructions/specifications, inspect merged Dashboard/Search UI and read-only M6B API source.
+- [x] Implement typed Search adapter, URL-applied state, filters/catalogs and semantic results.
+- [x] Add permanent browser/preview coverage and inspect responsive/theme captures; final expanded preview rerun remains in the gate below.
+- [x] Run full local Web gate and record scope, limitations and exact M7 handoff.
+
+### Surprises & Discoveries
+
+- The sibling API checkout is on `feat/search-result-contract` at `aa0927d`; it contains M6B, but this checkout alone does not prove deployment or GitHub merge state.
+- GitHub confirms rt-api PR #25 merged M6B at `19d769c`. The local `/api/schema` service was unavailable; a read-only schema-generation attempt could not start because Poetry tried to create a sandbox-denied virtualenv. Serializer/view/tests are the inspected contract, not live deployment proof.
+- The first screenshot stress fixture exposed cross-cell text collisions from long unbroken titles and names despite no document-level overflow. Search now requests a fixed shared-table layout with wrapping, while Dashboard retains the default layout. Desktop cell-width assertions and narrow captures pass.
+- Local dependency junctions returned missing type declarations inside the sandbox after interruption; identical `npm.cmd run typecheck` passed outside it. No install/lockfile edit was needed.
+- The M4 AppShell smoke still asserted Search's historical `.legacy-page` and light-only heading in Dark mode. M6C removed that compatibility class intentionally; its four theme assertions were updated, and the final full suite passes.
+- React StrictMode replays development catalog effects, so a two-page Flow catalog can appear four times in dev. The production Search preview observes its exact two Flow-page GETs. Catalog reads are separate from the one Search-result-GET budget.
+
+### Decision Log
+
+- Retain the exact `/search/requests` endpoint and custom `{count,page,page_size,results}` envelope. Use the M6B summaries directly, never a per-row Detail fetch.
+- Keep one applied URL state and explicit local drafts; do not add a result-cache framework merely to handle loading or StrictMode.
+- Keep the Search pager mounted during same-query page changes using the known server total, but render rows only when their data scope matches the applied URL. This preserves keyboard focus without labelling prior-page records as the new page.
+
+### Outcomes & Retrospective
+
+M6C is **PASS locally**. `npm.cmd run typecheck`, `npm.cmd run lint`, `npm.cmd run test:tokens` (4), `npm.cmd run test:theme` (10), and an explicit-test-base `npm.cmd run build` (154 modules) pass. CI-mode `npm.cmd run test:e2e -- --retries=0` passes 72/72 (including 24 Search, M4 shell, M3 primitives, Sprint 3 smoke and M5 Dashboard) without retries. Production previews against that same build pass: theme 5/5, Dashboard 14/14, Search 24/24. Search preview proves one Search GET per initial 0/1/10/25-result state and zero row Detail GETs; Apply/page/retry commit one Search GET, blank entry none. Catalog and shell permission reads were measured separately in intercepted browser fixtures. `git diff --check` and final file-scope checks follow the last documentation edit.
+
+Final Search architecture: `src/features/requestSearch.ts` normalizes M6B nested summaries, rank/source metadata and canonical singular ID/date params without a Detail import; `src/pages/SearchView.tsx` derives applied state only from URL, keeps explicit drafts, isolates stale responses/errors, and preserves the same-query page pager/focus without mislabelling old rows. `src/features/searchCatalogs.ts` uses the shared auth/tenant client for lazy complete Flow paging, dependent Status and searched/paginated tenant User lookups. `src/components/search/SearchFiltersPanel.tsx` uses native M3 Fields/controls with Apply/Cancel and local catalog loading/empty/error/retry; selected IDs remain applied when labels cannot be loaded. `RequestTable` accepts a small structural row type and optional match context/fixed Search layout, while its Dashboard default and API/call budget remain unchanged. Search has no `legacy-page`, Tag/sort/label params, fake snippet, numeric rank, repeated Open button or card-per-row.
+
+Screenshots in ignored `.agent/tmp/m6-search/` were inspected at 1440 Light/Dark, 1024 Light, 768 Dark and 320 Light, with normal/long rows, filters open/applied, empty and error states. Populated document overflow and desktop cell overflow assertions pass. A 640px CSS-width reflow proxy passed; actual browser zoom and screen-reader/WCAG certification are not claimed. No live API/SQL timing or deployed schema was verified. Sibling rt-api PR #25 is merged, but local schema generation was blocked before Django ran by Poetry's sandboxed virtualenv creation. The documented local pnpm launcher limitation remains; npm equivalents completed the Web gate, while hosted CI remains unrun for this branch. Browserslist age/terminal-color warnings are nonblocking.
+
+Scope: M6C changed only Search feature/page/catalog/presentation, safe shared request-row wrapping, focused AppShell/Search tests, one Search preview config/CI step and these docs. `src/api/dashboard.ts`, Home, Request Detail, Create, Admin, router/guards, API/SQL, token/theme runtime, dependencies and lockfile are unchanged. No commit/PR was requested. M6A and earlier sections below are historical evidence, not current work.
+
+Exact M7 handoff, only after separate authorization: inspect the real Request Detail API/bundle/activity/assignment/transition/upload contracts and permission behavior; redesign `/requests/:id` as the primary workbench with semantic Light/Dark/System, responsive properties and accessible actions, while preserving server transitions (no generic status PATCH), grouped comments/files, request_id navigation, tenant/auth and error/partial-data semantics. Measure Detail subresource fan-out before changing any API contract. Do not use M7 to redesign Create/Admin, add new workflow/RBAC or infer live backend acceptance from intercepted tests.
+
 ## Active audit: M6A Search UX and API contract
 
 M5C/M5D are merged by PR #28 at Web HEAD `e9438ae`; the clean current branch is `feat/search-foundation`. This task is documentation/audit only. Deliverables: `docs/design/07-search.md`, `docs/plans/sprint-4/m6-search-data-contract.md`, and this ExecPlan. The sibling API is read-only at `288ea61` on `main`, containing merged M5B list summaries. The live `http://127.0.0.1:8000/api/schema` connection is refused; deployed/generated-live contract state remains unverified.
