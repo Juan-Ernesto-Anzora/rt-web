@@ -1,30 +1,90 @@
 import api from "../lib/api";
-import { getRequestDetail } from "../api/requestDetail";
 import {
-  displayAssignee,
-  displayFlow,
-  displayStatus,
-  displayUser,
-  statusCategory,
-  type FlowDto,
-  type StatusDto,
-  type UserDto,
+  displayFlow, displayStatus, displayUser, statusCategory,
+  type FlowDto, type StatusDto, type UserDto,
 } from "../api/requestDisplay";
 
-export type SearchFacetKey = "status" | "assignee" | "flow" | "tag";
-
-export type RequestSearchFilters = {
-  query: string;
-  status: string[];
-  assignee: string[];
-  flow: string[];
-  tag: string[];
+export type SearchState = {
+  q: string;
+  flowId: string;
+  statusId: string;
+  assigneeId: string;
   updatedFrom: string;
   updatedTo: string;
   page: number;
-  pageSize: number;
-  sort: string;
 };
+
+export const EMPTY_SEARCH: SearchState = {
+  q: "", flowId: "", statusId: "", assigneeId: "",
+  updatedFrom: "", updatedTo: "", page: 1,
+};
+export const SEARCH_PAGE_SIZE = 25;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const URL_KEYS = new Set(["q", "flow_id", "status_id", "assignee_id", "updated_from", "updated_to", "page"]);
+
+export function validPublicId(value: string) {
+  return UUID.test(value);
+}
+
+export function validDay(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function validKeyword(value: string) {
+  return value.length <= 200 && /[\p{L}\p{N}_]/u.test(value);
+}
+
+export function searchParamsFor(state: SearchState) {
+  const params = new URLSearchParams();
+  if (state.q) params.set("q", state.q);
+  if (state.flowId) params.set("flow_id", state.flowId);
+  if (state.statusId) params.set("status_id", state.statusId);
+  if (state.assigneeId) params.set("assignee_id", state.assigneeId);
+  if (state.updatedFrom) params.set("updated_from", state.updatedFrom);
+  if (state.updatedTo) params.set("updated_to", state.updatedTo);
+  if (state.page > 1) params.set("page", String(state.page));
+  return params;
+}
+
+export function readSearchState(params: URLSearchParams) {
+  const warnings: string[] = [];
+  const state = { ...EMPTY_SEARCH };
+  if ([...params.keys()].some(key => !URL_KEYS.has(key))) warnings.push("Unsupported Search parameters were removed.");
+  const one = (key: string) => {
+    const values = params.getAll(key);
+    if (values.length > 1) { warnings.push(`Repeated ${key} filter was removed.`); return ""; }
+    return values[0] ?? "";
+  };
+  const q = one("q").trim();
+  if (q && validKeyword(q)) state.q = q;
+  else if (q) warnings.push("Invalid search text was removed.");
+  for (const [key, field] of [["flow_id", "flowId"], ["status_id", "statusId"], ["assignee_id", "assigneeId"]] as const) {
+    const value = one(key);
+    if (!value) continue;
+    if (validPublicId(value)) state[field] = value.toLowerCase();
+    else warnings.push(`Invalid ${key} filter was removed.`);
+  }
+  for (const [key, field] of [["updated_from", "updatedFrom"], ["updated_to", "updatedTo"]] as const) {
+    const value = one(key);
+    if (!value) continue;
+    if (validDay(value)) state[field] = value;
+    else warnings.push(`Invalid ${key} date was removed.`);
+  }
+  if (state.updatedFrom && state.updatedTo && state.updatedFrom > state.updatedTo) {
+    state.updatedTo = "";
+    warnings.push("The reversed updated-to date was removed.");
+  }
+  const rawPage = one("page");
+  if (rawPage) {
+    const page = Number(rawPage);
+    if (/^[1-9]\d*$/.test(rawPage) && Number.isSafeInteger(page)) state.page = page;
+    else warnings.push("Invalid page number was removed.");
+  }
+  return { state, warnings, canonical: searchParamsFor(state) };
+}
 
 export type RequestSearchResult = {
   id: string;
@@ -32,118 +92,88 @@ export type RequestSearchResult = {
   title: string;
   status: string;
   statusCategory?: string;
+  priority: string;
   assignee: string;
   requester: string;
   flow: string;
-  tags: string[];
   updatedAt: string;
-  snippet: string;
+  createdAt: string;
+  rank: number;
+  matchSources: Array<"request" | "comment" | "attachment">;
+  matchContext?: string;
 };
 
 export type RequestSearchResponse = {
-  results: RequestSearchResult[];
   count: number;
+  page: number;
+  pageSize: number;
+  results: RequestSearchResult[];
 };
 
 type SearchResultDto = {
-  requestid?: string;
-  humanid?: string;
   request_id?: string;
   human_id?: string;
   title?: string;
-  statusid?: string;
-  status_id?: string;
+  priority?: string;
+  status?: StatusDto | null;
   status_name?: string;
-  status_category?: string;
-  status?: string | StatusDto | null;
+  requester?: UserDto | null;
+  assignee?: UserDto | null;
   assignee_id?: string | null;
-  assignee?: string | UserDto | null;
-  assignee_name?: string | null;
-  requester?: string | UserDto | null;
-  requester_name?: string | null;
-  flow?: string | FlowDto | null;
-  flow_name?: string;
-  tags?: string[];
+  flow?: FlowDto | null;
+  created_at?: string;
   updated_at?: string;
-  snippet?: string;
-  highlight?: string;
+  rank?: number;
+  match_sources?: string[];
 };
 
 type SearchResponseDto = {
-  results?: SearchResultDto[];
-  count?: number;
+  count: number;
+  page: number;
+  page_size: number;
+  results: SearchResultDto[];
 };
 
-function normalizeSearchResult(result: SearchResultDto): RequestSearchResult {
-  const requestId = result.request_id ?? "";
+function normalizeResult(result: SearchResultDto): RequestSearchResult {
+  const status = displayStatus(result.status, result.status_name);
+  const requester = displayUser(result.requester);
+  const flow = displayFlow(result.flow);
+  const matchSources = (result.match_sources ?? []).filter(
+    (source): source is "request" | "comment" | "attachment" =>
+      source === "request" || source === "comment" || source === "attachment",
+  );
+  const extraSources = [matchSources.includes("comment") ? "comments" : "", matchSources.includes("attachment") ? "attachment names" : ""].filter(Boolean);
   return {
-    id: (result.human_id ?? result.humanid ?? requestId) || result.requestid || "-",
-    requestId,
-    title: result.title ?? "Untitled request",
-    status: displayStatus(result.status, result.status_name ?? result.status_category ?? result.statusid ?? result.status_id),
-    statusCategory: statusCategory(result.status, result.status_category),
-    assignee: displayAssignee(result.assignee, result.assignee_name),
-    requester: displayUser(result.requester, result.requester_name),
-    flow: displayFlow(result.flow, result.flow_name),
-    tags: result.tags ?? [],
+    id: result.human_id || "ID unavailable",
+    requestId: result.request_id && validPublicId(result.request_id) ? result.request_id : "",
+    title: result.title || "Untitled request",
+    status: status === "-" ? "Status unavailable" : status,
+    statusCategory: statusCategory(result.status),
+    priority: result.priority ?? "-",
+    assignee: result.assignee === null && !result.assignee_id ? "Unassigned" : displayUser(result.assignee, undefined, "Assignee unavailable"),
+    requester: requester === "-" ? "Requester unavailable" : requester,
+    flow: flow === "-" ? "Flow unavailable" : flow,
+    createdAt: result.created_at ?? "",
     updatedAt: result.updated_at ?? "",
-    snippet: result.snippet ?? result.highlight ?? "",
+    rank: result.rank ?? 0,
+    matchSources,
+    matchContext: extraSources.length ? `Matched in ${extraSources.join(" and ")}` : undefined,
   };
 }
 
-async function enrichSearchResultsWithDetail(results: RequestSearchResult[]) {
-  return Promise.all(
-    results.map(async (result) => {
-      if (!result.requestId) return result;
-      try {
-        const detail = await getRequestDetail(result.requestId);
-        return {
-          ...result,
-          title: detail.title,
-          status: detail.status,
-          statusCategory: detail.statusCategory,
-          assignee: detail.assignee,
-          requester: detail.requester,
-          flow: detail.flow,
-          updatedAt: detail.updatedAt || result.updatedAt,
-          snippet: result.snippet || detail.description,
-        };
-      } catch {
-        return result;
-      }
-    }),
-  );
-}
-
-function appendListParam(params: URLSearchParams, key: string, values: string[]) {
-  values.forEach((value) => {
-    if (value) params.append(key, value);
-  });
-}
-
-export function buildSearchParams(filters: RequestSearchFilters) {
-  const params = new URLSearchParams();
-  if (filters.query.trim()) params.set("q", filters.query.trim());
-  appendListParam(params, "status", filters.status);
-  appendListParam(params, "assignee", filters.assignee);
-  appendListParam(params, "flow", filters.flow);
-  appendListParam(params, "tag", filters.tag);
-  if (filters.updatedFrom) params.set("updated_from", filters.updatedFrom);
-  if (filters.updatedTo) params.set("updated_to", filters.updatedTo);
-  params.set("page", String(filters.page));
-  params.set("page_size", String(filters.pageSize));
-  params.set("sort", filters.sort);
-  return params;
-}
-
-export async function searchRequests(filters: RequestSearchFilters): Promise<RequestSearchResponse> {
-  const response = await api.get<SearchResponseDto | SearchResultDto[]>("/search/requests", {
-    params: buildSearchParams(filters),
-  });
-  const results = Array.isArray(response.data) ? response.data : response.data.results ?? [];
-  const normalizedResults = results.map(normalizeSearchResult);
+export async function searchRequests(state: SearchState): Promise<RequestSearchResponse> {
+  const params = searchParamsFor(state);
+  params.set("page", String(state.page));
+  params.set("page_size", String(SEARCH_PAGE_SIZE));
+  const response = await api.get<SearchResponseDto>("/search/requests", { params });
+  const data = response.data;
+  if (!Array.isArray(data.results) || !Number.isInteger(data.count) || data.count < 0) {
+    throw new Error("Search returned an invalid result envelope.");
+  }
   return {
-    results: await enrichSearchResultsWithDetail(normalizedResults),
-    count: Array.isArray(response.data) ? results.length : response.data.count ?? results.length,
+    count: data.count,
+    page: data.page,
+    pageSize: data.page_size,
+    results: data.results.map(normalizeResult),
   };
 }
