@@ -1,5 +1,39 @@
 # Establish the Request Tracker UI/UX foundation
 
+## Active audit: M7A Request Detail workspace UX and API contract
+
+Purpose: specify a durable Request Detail workspace without changing runtime behavior. Selected active deliverables are `docs/design/08-request-detail.md` (normative UX) and `docs/plans/sprint-4/m7-request-detail-contract.md` (evidence, API options and staged handoff). M1-M6 were reported complete and are present in the current Web checkout at `f0c1587`; historical unchecked items below are not authorization to restart them. M7A explicitly excludes Web Detail redesign, sibling API edits and M7B/C implementation.
+
+Plan and acceptance: read instructions/Blueprint/M1-M6 specifications; trace Web Detail, shared controls and navigation and read-only sibling API serializers/views/models/tests; measure a production-preview intercepted request budget and failure paths; document contract divergences, capability/security gaps, architecture options, UX states and separate M7B/M7C acceptance. Verify both document references, docs-only tracked diff, no sibling edits and `git diff --check`. No full Web PR gate or live SQL/MinIO/API claim is made for this documentation-only audit.
+
+### Progress
+
+- [x] Confirm clean `feat/request-detail-foundation` checkout, read instructions and relevant design/plan baseline.
+- [x] Trace Request Detail Web requests/mutations/UI and read-only sibling API endpoint/serializer/service/test contracts.
+- [x] Measure production-preview intercepted initial, mutation, partial/core failure and retry requests; remove temporary fixture.
+- [x] Create M7 contract audit and normative workspace UX specification with bounded M7B/M7C handoffs.
+- [x] Verify cited references, docs-only Web scope, no sibling edits by this task and `git diff --check` after documentation edits. Sibling worktree cleanliness remains unverified because its `git status` was unavailable here.
+
+### Surprises & Discoveries
+
+- Current Comment/Activity serializers emit `createdat`, while Web requires `created_at`; successful real responses can be filtered out as if empty. Comment author is an ID without a returned label, not a nested display object.
+- Initial production-preview Detail load is six GETs, not four. Each observed mutation refresh is six GETs because the transitions effect reads once on `loadAttempt` with stale Detail and again after new Detail state.
+- One intercepted comments 500 was displayed as `No comments yet.` because `Promise.allSettled` converts it to `[]`. Core failure made only core and eager users GETs; core Retry made five GETs because the directory was already loaded.
+- The existing `/detail/` API bundle is unpaginated/all-or-nothing. Raw `storageurl` is not a scan-gated download contract; Web currently treats it as a link even when pending/blocked. `requires_comment` and transition labels are not current API fields.
+- API source has no operation-specific RBAC checks on this workspace; stored transition guard role/permission fields are not consulted. Finalize accepts but does not use `idempotency_key`, and does not validate presigned object ownership/existence in inspected source.
+
+### Decision Log
+
+- Recommend core Detail plus a bounded, cursor-paginated unified timeline, lazy tenant-user directory and server-authoritative action/download capabilities. Keep the current unbounded bundle for compatibility rather than switching Web to it solely to reduce HTTP count.
+- Treat comment/activity DTO correction, actor attribution, assignment audit, upload integrity/idempotency, clean-only download and permission policy as separate M7B API decisions. Do not simulate these guarantees in a Web-only redesign.
+- Preserve existing transition POST as status authority and null assignment semantics. M7C should use one coherent timeline/composer with isolated region failures and mutation-specific refresh, not four large page cards or a generic status PATCH.
+
+### Outcomes & Retrospective
+
+M7A is **PASS for documentation/source and intercepted-browser audit**. `docs/design/08-request-detail.md` defines the final workspace hierarchy, states, semantic theme, responsive and WCAG 2.2 AA acceptance. `docs/plans/sprint-4/m7-request-detail-contract.md` records exact current endpoints, measured request budgets, false-empty/duplication and security gaps, options and bounded M7B/M7C scopes. All explicitly cited Web/API source and design files resolve. A temporary one-case Chromium fixture against a 154-module production build passed after correcting a source-derived retry expectation; it and its temporary config were removed, leaving no permanent test change. The first sandboxed build attempt hit Windows `realpath` EPERM; the same build passed with permitted escalation. Only the two new docs and this ExecPlan are changed, and `git diff --check` passes. No live API/SQL/MinIO, hosted CI, deployment or assistive-technology pass is claimed.
+
+**Exact M7B starting point:** approve/implement the smallest API contract that supplies a bounded, tenant-scoped typed timeline, correct actor/comment/attachment grouping, clean-only authorized download, upload integrity/retry semantics and authoritative operation permissions, with OpenAPI and negative tests. Resolve unresolved policy questions in `m7-request-detail-contract.md` before claiming those capabilities. **Exact M7C starting point:** once M7B is verified, replace only `/requests/:id` using `08-request-detail.md`, migrate to semantic theme/primitives, isolate failures, reduce redundant reads, preserve server transitions and public-ID/context navigation, then run full Web and live integration gates. Do not start either in M7A.
+
 ## Active calibration: M6D Search visual hierarchy
 
 M6C passes the complete local gate on `feat/search-redesign`; its uncommitted work is preserved. M6D is a bounded visual/copy calibration only. The approved Search specification is `docs/design/07-search.md`, with M1-M4 token, primitive and shell contracts unchanged. No M7, API, routing, RBAC, URL/filter/request-count or Dashboard work is authorized.
